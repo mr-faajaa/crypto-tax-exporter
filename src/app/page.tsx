@@ -1,6 +1,15 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Loader2, Download, AlertCircle, Wallet } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface Transaction {
   timestamp: string;
@@ -11,14 +20,38 @@ interface Transaction {
   total: number;
   fees: number;
   hash: string;
+  chain: string;
 }
+
+const SUPPORTED_CHAINS = [
+  { id: 'solana', name: 'Solana' },
+  { id: 'ethereum', name: 'Ethereum' },
+  { id: 'base', name: 'Base' },
+  { id: 'arbitrum', name: 'Arbitrum' },
+  { id: 'polygon', name: 'Polygon' },
+];
 
 export default function HomePage() {
   const [wallet, setWallet] = useState('');
+  const [chain, setChain] = useState('solana');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [chain, setChain] = useState('solana');
+  const [hasSearched, setHasSearched] = useState(false);
+
+  const validateWallet = useCallback((addr: string, chainId: string): boolean => {
+    switch (chainId) {
+      case 'solana':
+        return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(addr);
+      case 'ethereum':
+      case 'base':
+      case 'arbitrum':
+      case 'polygon':
+        return /^0x[a-fA-F0-9]{40}$/.test(addr);
+      default:
+        return addr.length > 0;
+    }
+  }, []);
 
   const fetchTransactions = useCallback(async () => {
     if (!wallet.trim()) {
@@ -26,32 +59,39 @@ export default function HomePage() {
       return;
     }
 
+    if (!validateWallet(wallet, chain)) {
+      setError(`Invalid wallet address for ${SUPPORTED_CHAINS.find(c => c.id === chain)?.name}`);
+      return;
+    }
+
     setLoading(true);
     setError('');
+    setHasSearched(true);
 
     try {
-      const response = await fetch(`/api/transactions?wallet=${wallet}&chain=${chain}`);
+      const response = await fetch(`/api/transactions?wallet=${encodeURIComponent(wallet)}&chain=${chain}`);
       const data = await response.json();
 
       if (!response.ok) {
         throw new Error(data.error || 'Failed to fetch transactions');
       }
 
-      setTransactions(data.transactions);
+      setTransactions(data.transactions || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
       setTransactions([]);
     } finally {
       setLoading(false);
     }
-  }, [wallet, chain]);
+  }, [wallet, chain, validateWallet]);
 
   const exportToCSV = useCallback(() => {
     if (transactions.length === 0) return;
 
-    const headers = ['timestamp', 'asset', 'side', 'quantity', 'price', 'total', 'fees', 'hash'];
+    const headers = ['timestamp', 'chain', 'asset', 'side', 'quantity', 'price', 'total', 'fees', 'hash'];
     const rows = transactions.map(tx => [
       tx.timestamp,
+      tx.chain,
       tx.asset,
       tx.side,
       tx.quantity.toString(),
@@ -72,192 +112,185 @@ export default function HomePage() {
   }, [transactions, wallet]);
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
-      <header style={{ marginBottom: '2rem' }}>
-        <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
-          Crypto Tax Exporter
-        </h1>
-        <p style={{ color: '#666' }}>
-          Export crypto transactions to tax-compatible CSV format
-        </p>
-      </header>
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto py-10 px-4 max-w-6xl">
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="text-3xl font-bold flex items-center gap-2">
+              <Wallet className="h-8 w-8" />
+              Crypto Tax Exporter
+            </CardTitle>
+            <CardDescription>
+              Export crypto transactions to tax-compatible CSV format. Supports multiple chains.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Select value={chain} onValueChange={setChain}>
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <SelectValue placeholder="Select chain" />
+                </SelectTrigger>
+                <SelectContent>
+                  {SUPPORTED_CHAINS.map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-      <div style={{ 
-        display: 'flex', 
-        gap: '1rem', 
-        marginBottom: '2rem',
-        flexWrap: 'wrap'
-      }}>
-        <select
-          value={chain}
-          onChange={(e) => setChain(e.target.value)}
-          style={{
-            padding: '0.75rem 1rem',
-            borderRadius: '8px',
-            border: '1px solid #ddd',
-            fontSize: '1rem',
-            backgroundColor: 'white'
-          }}
-        >
-          <option value="solana">Solana</option>
-          <option value="ethereum" disabled>Ethereum (Coming Soon)</option>
-          <option value="bittensor" disabled>Bittensor (Coming Soon)</option>
-        </select>
+              <Input
+                placeholder={`Enter ${SUPPORTED_CHAINS.find(c => c.id === chain)?.name} wallet address...`}
+                value={wallet}
+                onChange={e => setWallet(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && fetchTransactions()}
+                className="flex-1"
+                disabled={loading}
+              />
 
-        <input
-          type="text"
-          placeholder="Enter wallet address..."
-          value={wallet}
-          onChange={(e) => setWallet(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && fetchTransactions()}
-          style={{
-            flex: 1,
-            minWidth: '300px',
-            padding: '0.75rem 1rem',
-            borderRadius: '8px',
-            border: '1px solid #ddd',
-            fontSize: '1rem'
-          }}
-        />
-
-        <button
-          onClick={fetchTransactions}
-          disabled={loading}
-          style={{
-            padding: '0.75rem 1.5rem',
-            borderRadius: '8px',
-            border: 'none',
-            backgroundColor: loading ? '#ccc' : '#0066ff',
-            color: 'white',
-            fontSize: '1rem',
-            fontWeight: '500',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            transition: 'background-color 0.2s'
-          }}
-        >
-          {loading ? 'Loading...' : 'Fetch'}
-        </button>
-      </div>
-
-      {error && (
-        <div style={{
-          padding: '1rem',
-          borderRadius: '8px',
-          backgroundColor: '#fee',
-          color: '#c00',
-          marginBottom: '1rem'
-        }}>
-          {error}
-        </div>
-      )}
-
-      {transactions.length > 0 && (
-        <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ color: '#666' }}>
-            {transactions.length} transactions found
-          </span>
-          <button
-            onClick={exportToCSV}
-            style={{
-              padding: '0.75rem 1.5rem',
-              borderRadius: '8px',
-              border: 'none',
-              backgroundColor: '#10b981',
-              color: 'white',
-              fontSize: '1rem',
-              fontWeight: '500',
-              cursor: 'pointer'
-            }}
-          >
-            Download CSV
-          </button>
-        </div>
-      )}
-
-      {transactions.length > 0 && (
-        <div style={{ 
-          borderRadius: '12px', 
-          border: '1px solid #e5e7eb',
-          overflow: 'hidden'
-        }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead style={{ backgroundColor: '#f9fafb' }}>
-              <tr>
-                {['Timestamp', 'Asset', 'Side', 'Quantity', 'Price', 'Total', 'Fees', 'Hash'].map(h => (
-                  <th key={h} style={{ padding: '1rem', textAlign: 'left', fontWeight: '600', fontSize: '0.875rem' }}>
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {transactions.slice(0, 100).map((tx, i) => (
-                <tr key={tx.hash + i} style={{ borderTop: '1px solid #e5e7eb' }}>
-                  <td style={{ padding: '0.75rem 1rem', fontSize: '0.875rem' }}>
-                    {new Date(tx.timestamp).toLocaleDateString()}
-                  </td>
-                  <td style={{ padding: '0.75rem 1rem' }}>
-                    <span style={{ 
-                      backgroundColor: '#f3f4f6', 
-                      padding: '0.25rem 0.5rem', 
-                      borderRadius: '4px',
-                      fontSize: '0.875rem',
-                      fontWeight: '500'
-                    }}>
-                      {tx.asset}
-                    </span>
-                  </td>
-                  <td style={{ padding: '0.75rem 1rem' }}>
-                    <span style={{ 
-                      color: tx.side === 'BUY' ? '#10b981' : '#ef4444',
-                      fontWeight: '500'
-                    }}>
-                      {tx.side}
-                    </span>
-                  </td>
-                  <td style={{ padding: '0.75rem 1rem', fontFamily: 'monospace' }}>
-                    {tx.quantity.toFixed(4)}
-                  </td>
-                  <td style={{ padding: '0.75rem 1rem', fontFamily: 'monospace' }}>
-                    ${tx.price.toFixed(2)}
-                  </td>
-                  <td style={{ padding: '0.75rem 1rem', fontFamily: 'monospace', fontWeight: '500' }}>
-                    ${tx.total.toFixed(2)}
-                  </td>
-                  <td style={{ padding: '0.75rem 1rem', fontFamily: 'monospace', color: '#666' }}>
-                    ${tx.fees.toFixed(2)}
-                  </td>
-                  <td style={{ padding: '0.75rem 1rem', fontFamily: 'monospace', fontSize: '0.75rem', color: '#666', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {tx.hash}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {transactions.length > 100 && (
-            <div style={{ padding: '1rem', textAlign: 'center', color: '#666', fontSize: '0.875rem' }}>
-              Showing 100 of {transactions.length} transactions. Download CSV for full data.
+              <Button onClick={fetchTransactions} disabled={loading}>
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  'Fetch'
+                )}
+              </Button>
             </div>
-          )}
-        </div>
-      )}
 
-      {transactions.length === 0 && !loading && !error && (
-        <div style={{ 
-          textAlign: 'center', 
-          padding: '4rem 2rem', 
-          color: '#666',
-          backgroundColor: '#f9fafb',
-          borderRadius: '12px'
-        }}>
-          <p style={{ fontSize: '1.125rem', marginBottom: '0.5rem' }}>
-            Enter a wallet address to get started
-          </p>
-          <p style={{ fontSize: '0.875rem' }}>
-            Supports Solana with more chains coming soon
-          </p>
-        </div>
-      )}
+            {error && (
+              <Alert variant="destructive" className="mt-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+
+        {transactions.length > 0 && (
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <CardTitle>Transactions</CardTitle>
+                  <CardDescription>
+                    {transactions.length} transactions found
+                  </CardDescription>
+                </div>
+                <Button onClick={exportToCSV} variant="outline">
+                  <Download className="mr-2 h-4 w-4" />
+                  Download CSV
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Chain</TableHead>
+                      <TableHead>Asset</TableHead>
+                      <TableHead>Side</TableHead>
+                      <TableHead className="text-right">Quantity</TableHead>
+                      <TableHead className="text-right">Price</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                      <TableHead className="text-right">Fees</TableHead>
+                      <TableHead className="hidden xl:table-cell">Hash</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {transactions.map((tx, i) => (
+                      <TableRow key={`${tx.hash}-${i}`}>
+                        <TableCell>
+                          {new Date(tx.timestamp).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-secondary">
+                            {tx.chain}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-mono font-medium">{tx.asset}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className={cn(
+                            "font-medium",
+                            tx.side === 'BUY' ? "text-green-600" : 
+                            tx.side === 'SELL' ? "text-red-600" : "text-gray-600"
+                          )}>
+                            {tx.side}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {tx.quantity.toFixed(4)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          ${tx.price.toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono font-medium">
+                          ${tx.total.toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-muted-foreground">
+                          ${tx.fees.toFixed(2)}
+                        </TableCell>
+                        <TableCell className="hidden xl:table-cell font-mono text-sm text-muted-foreground max-w-[120px] truncate">
+                          {tx.hash}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {loading && (
+          <Card className="mt-8">
+            <CardHeader>
+              <Skeleton className="h-6 w-48" />
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="flex items-center space-x-4">
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="h-4 w-16" />
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="h-4 w-16" />
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {!loading && hasSearched && transactions.length === 0 && !error && (
+          <Card className="mt-8">
+            <CardContent className="py-10 text-center">
+              <p className="text-muted-foreground">
+                No transactions found for this wallet on {SUPPORTED_CHAINS.find(c => c.id === chain)?.name}
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {!loading && !hasSearched && (
+          <Card className="mt-8">
+            <CardContent className="py-16 text-center">
+              <Wallet className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <p className="text-lg text-muted-foreground mb-2">
+                Enter a wallet address to get started
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Supports {SUPPORTED_CHAINS.map(c => c.name).join(', ')}
+              </p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   );
 }

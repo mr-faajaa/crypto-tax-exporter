@@ -9,13 +9,23 @@ interface Transaction {
   total: number;
   fees: number;
   hash: string;
+  chain: string;
+}
+
+// Allium API configuration
+const ALLIUM_API_URL = 'https://api.allium.so';
+const ALLIUM_API_KEY = process.env.ALLIUM_API_KEY || '';
+const RATE_LIMIT_DELAY = 1100; // ms (Allium allows 1 req/sec)
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const wallet = searchParams.get('wallet');
   const chain = searchParams.get('chain') || 'solana';
-  const useMock = searchParams.get('mock') === 'true' || !process.env.HELIUS_API_KEY;
+  const useMock = searchParams.get('mock') === 'true';
 
   if (!wallet) {
     return NextResponse.json({ error: 'Wallet address required' }, { status: 400 });
@@ -24,116 +34,170 @@ export async function GET(request: NextRequest) {
   try {
     let transactions: Transaction[];
 
-    if (useMock) {
-      // Use mock data for development
-      transactions = generateMockTransactions(wallet);
+    if (useMock || !ALLIUM_API_KEY) {
+      // Use mock data for development or when no API key
+      console.log('Using mock data (no Allium API key or mock=true)');
+      transactions = generateMockTransactions(wallet, chain);
     } else {
-      // Use Helius API for production
-      transactions = await fetchHeliusTransactions(wallet, chain);
+      // Use Allium API for production
+      transactions = await fetchAlliumTransactions(wallet, chain);
     }
 
     return NextResponse.json({ transactions });
   } catch (error) {
     console.error('Error fetching transactions:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch transactions' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch transactions' },
       { status: 500 }
     );
   }
 }
 
-async function fetchHeliusTransactions(wallet: string, chain: string): Promise<Transaction[]> {
-  if (chain !== 'solana') {
-    throw new Error(`Chain ${chain} not supported yet`);
-  }
-
-  const apiKey = process.env.HELIUS_API_KEY;
-  if (!apiKey) {
-    throw new Error('HELIUS_API_KEY not configured');
-  }
+async function fetchAlliumTransactions(wallet: string, chain: string): Promise<Transaction[]> {
+  // Rate limit to 1 request/second
+  await sleep(RATE_LIMIT_DELAY);
 
   try {
     const response = await fetch(
-      `https://api.helius.xyz/v0/addresses/${wallet}/transactions?api-key=${apiKey}&type=ANY&limit=100`
+      `${ALLIUM_API_URL}/api/v1/developer/wallet/transactions`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-KEY': ALLIUM_API_KEY,
+        },
+        body: JSON.stringify([
+          {
+            address: wallet,
+            chain: chain.toLowerCase(),
+          }
+        ]),
+      }
     );
 
     if (!response.ok) {
-      throw new Error(`Helius API error: ${response.statusText}`);
+      const errorText = await response.text();
+      console.error('Allium API error:', response.status, errorText);
+      
+      // Fallback to mock data on API error
+      if (response.status === 429 || response.status >= 500) {
+        console.warn('Allium API error, falling back to mock data');
+        return generateMockTransactions(wallet, chain);
+      }
+      
+      throw new Error(`Allium API error: ${response.status}`);
     }
 
     const data = await response.json();
-    return transformHeliusData(data);
+    return transformAlliumData(data, chain);
   } catch (error) {
-    console.error('Helius fetch error:', error);
-    // Fallback to mock data on error
-    return generateMockTransactions(wallet);
+    console.error('Allium fetch error:', error);
+    // Fallback to mock data on network error
+    return generateMockTransactions(wallet, chain);
   }
 }
 
-function transformHeliusData(data: any[]): Transaction[] {
-  if (!Array.isArray(data)) {
+function transformAlliumData(data: any, chain: string): Transaction[] {
+  if (!data || !Array.isArray(data)) {
     return [];
   }
 
-  return data.map((tx: any) => ({
-    timestamp: new Date(tx.timestamp * 1000).toISOString(),
-    asset: getAsset(tx),
-    side: getSide(tx),
-    quantity: Math.abs(getQuantity(tx)),
-    price: getPrice(tx),
-    total: Math.abs(getNativeTotal(tx)),
-    fees: (tx.fee || 0) / 1e9,
-    hash: tx.signature || ''
-  })).filter(tx => tx.asset !== 'UNKNOWN');
+  // Allium returns an array of results for each address
+  const results = data[0]?.result || [];
+  if (!Array.isArray(results)) {
+    return [];
+  }
+
+  return results.map((tx: any) => ({
+    timestamp: new Date(tx.block_timestamp || tx.timestamp).toISOString(),
+    asset: extractAsset(tx),
+    side: determineSide(tx),
+    quantity: Math.abs(tx.token_change_amount || tx.quantity || 0),
+    price: calculatePrice(tx),
+    total: Math.abs(tx.native_transfer_amount || tx.total_value || 0),
+    fees: (tx.fee || 0) / 1e9, // Convert from lamports/smallest unit if needed
+    hash: tx.tx_hash || tx.signature || '',
+    chain: chain,
+  })).filter(tx => tx.asset !== 'UNKNOWN' && tx.hash !== '');
 }
 
-function getAsset(tx: any): string {
-  const changes = tx.tokenChanges || [];
-  if (changes.length === 0) return 'SOL';
-  const mint = changes[0]?.mint;
-  return mint ? mint.slice(0, 8).toUpperCase() : 'UNKNOWN';
+function extractAsset(tx: any): string {
+  // Try various fields Allium might return
+  const tokenAddress = tx.token_address || tx.mint || tx.token_mint;
+  if (tokenAddress) {
+    // Return shortened address as asset identifier
+    return tokenAddress.slice(0, 8).toUpperCase();
+  }
+  
+  const symbol = tx.token_symbol || tx.symbol;
+  if (symbol) {
+    return symbol.toUpperCase();
+  }
+  
+  // Native chain asset
+  return chainToNativeAsset(tx.chain || 'unknown');
 }
 
-function getSide(tx: any): string {
-  const nativeChanges = tx.nativeChanges || [];
-  if (nativeChanges.length === 0) return 'TRANSFER';
+function chainToNativeAsset(chain: string): string {
+  const nativeAssets: Record<string, string> = {
+    solana: 'SOL',
+    ethereum: 'ETH',
+    base: 'ETH',
+    arbitrum: 'ETH',
+    polygon: 'MATIC',
+    optimism: 'ETH',
+    avax: 'AVAX',
+  };
+  return nativeAssets[chain.toLowerCase()] || 'UNKNOWN';
+}
+
+function determineSide(tx: any): string {
+  const nativeChange = tx.native_change || tx.native_transfer_amount || 0;
+  const tokenChange = tx.token_change_amount || tx.quantity || 0;
   
-  const hasBuy = nativeChanges.some((c: any) => c.amount > 0);
-  const hasSell = nativeChanges.some((c: any) => c.amount < 0);
+  if (nativeChange > 0 && tokenChange < 0) return 'BUY';
+  if (nativeChange < 0 && tokenChange > 0) return 'SELL';
+  if (nativeChange < 0 && tokenChange === 0) return 'TRANSFER_OUT';
+  if (nativeChange > 0 && tokenChange === 0) return 'TRANSFER_IN';
+  if (tokenChange !== 0) return tokenChange > 0 ? 'BUY' : 'SELL';
   
-  if (hasBuy && !hasSell) return 'BUY';
-  if (!hasBuy && hasSell) return 'SELL';
   return 'TRANSFER';
 }
 
-function getQuantity(tx: any): number {
-  const changes = tx.tokenChanges || [];
-  return changes.reduce((sum: number, c: any) => sum + (c.tokenAmount || 0), 0);
+function calculatePrice(tx: any): number {
+  const nativeTotal = Math.abs(tx.native_transfer_amount || tx.native_change || 0);
+  const tokenAmount = Math.abs(tx.token_change_amount || tx.quantity || 0);
+  
+  if (tokenAmount > 0) {
+    // Convert native from smallest unit (e.g., wei, lamports)
+    const nativeDecimals = tx.native_decimals || 9;
+    const nativeInEth = nativeTotal / Math.pow(10, nativeDecimals);
+    return nativeInEth / tokenAmount;
+  }
+  
+  return 0;
 }
 
-function getPrice(tx: any): number {
-  const nativeChanges = tx.nativeChanges || [];
-  const nativeTotal = Math.abs(nativeChanges.reduce((sum: number, c: any) => sum + (c.amount || 0), 0)) / 1e9;
-  const tokenTotal = getQuantity(tx);
-  return tokenTotal > 0 ? nativeTotal / tokenTotal : 0;
-}
+function generateMockTransactions(wallet: string, chain: string): Transaction[] {
+  const assets: Record<string, string[]> = {
+    solana: ['SOL', 'USDC', 'BONK', 'JTO', 'HNT'],
+    ethereum: ['ETH', 'USDC', 'USDT', 'LINK', 'UNI'],
+    base: ['ETH', 'USDC', 'cbBTC', 'AERO'],
+    arbitrum: ['ETH', 'USDC', 'ARB', 'GMX'],
+    polygon: ['MATIC', 'USDC', 'LINK', 'AAVE'],
+  };
 
-function getNativeTotal(tx: any): number {
-  const nativeChanges = tx.nativeChanges || [];
-  return nativeChanges.reduce((sum: number, c: any) => sum + Math.abs(c.amount || 0), 0) / 1e9;
-}
-
-function generateMockTransactions(wallet: string): Transaction[] {
-  const assets = ['SOL', 'BTC', 'ETH', 'USDC'];
+  const chainAssets = assets[chain] || assets.solana;
   const sides = ['BUY', 'SELL'];
   const transactions: Transaction[] = [];
 
   for (let i = 0; i < 25; i++) {
     const side = sides[Math.floor(Math.random() * sides.length)];
-    const asset = assets[Math.floor(Math.random() * assets.length)];
+    const asset = chainAssets[Math.floor(Math.random() * chainAssets.length)];
     const quantity = Math.random() * 10;
-    const price = Math.random() * 2000 + 50;
-    const fees = Math.random() * 10;
+    const basePrice = asset === 'SOL' ? 100 : asset === 'ETH' ? 3000 : Math.random() * 10 + 0.5;
+    const price = basePrice + (Math.random() * basePrice * 0.1 - basePrice * 0.05);
+    const fees = Math.random() * 5;
 
     transactions.push({
       timestamp: new Date(Date.now() - i * 86400000 * Math.random() * 30).toISOString(),
@@ -143,7 +207,8 @@ function generateMockTransactions(wallet: string): Transaction[] {
       price,
       total: quantity * price,
       fees,
-      hash: wallet.slice(0, 8) + Math.random().toString(36).substring(2, 10)
+      hash: wallet.slice(0, 8) + Math.random().toString(36).substring(2, 10),
+      chain,
     });
   }
 
