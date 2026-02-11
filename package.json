@@ -8,6 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@solana/web3.js": "^1.98.4",
     "@tailwindcss/postcss": "^4.1.18",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -16,7 +17,8 @@
     "radix-ui": "^1.4.3",
     "react": "18.2.0",
     "react-dom": "18.2.0",
-    "tailwind-merge": "^2.6.1"
+    "tailwind-merge": "^2.6.1",
+    "viem": "^2.45.3"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
