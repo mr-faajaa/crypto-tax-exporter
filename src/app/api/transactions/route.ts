@@ -68,14 +68,7 @@ async function fetchTransactions(wallet: string, chain: string): Promise<Transac
 }
 
 async function fetchSolanaTransactions(wallet: string): Promise<Transaction[]> {
-  const connection = new Connection(RPC_ENDPOINTS.solana, {
-    commitment: 'confirmed',
-    fetchOptions: {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    },
-  });
+  const connection = new Connection(RPC_ENDPOINTS.solana, 'confirmed');
 
   const publicKey = new PublicKey(wallet);
   
