@@ -23,7 +23,8 @@
     "react-countup": "^6.5.3",
     "react-dom": "18.2.0",
     "tailwind-merge": "^2.6.1",
-    "three": "^0.150.1",
+    "three": "^0.182.0",
+    "three-mesh-bvh": "^0.8.3",
     "viem": "^2.45.3"
   },
   "devDependencies": {
