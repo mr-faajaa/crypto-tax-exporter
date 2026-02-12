@@ -160,8 +160,8 @@ export default function HomePage() {
       <div className="container mx-auto py-8 px-4 max-w-7xl">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold flex items-center gap-3">
-            <Activity className="h-8 w-8 text-primary" />
+          <h1 className="text-3xl font-bold flex items-center gap-3 text-wrap: balance">
+            <Activity className="h-8 w-8 text-primary" aria-hidden="true" />
             Crypto Tax Exporter
           </h1>
           <p className="text-muted-foreground mt-2">
@@ -173,7 +173,7 @@ export default function HomePage() {
         <Card className="mb-8 shadow-lg">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Wallet className="h-5 w-5" />
+              <Wallet className="h-5 w-5" aria-hidden="true" />
               Wallet Search
             </CardTitle>
           </CardHeader>
@@ -281,12 +281,14 @@ export default function HomePage() {
             <CardContent className="pt-6">
               <div className="flex flex-wrap gap-4 items-center">
                 <div className="relative flex-1 min-w-[200px]">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
                   <Input
                     placeholder="Search transactions..."
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
                     className="pl-9"
+                    aria-label="Search transactions"
+                    autoComplete="off"
                   />
                 </div>
 
@@ -386,16 +388,16 @@ export default function HomePage() {
                             {tx.side}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right font-mono">
+                        <TableCell className="text-right font-mono tabular-nums">
                           {tx.quantity.toFixed(4)}
                         </TableCell>
-                        <TableCell className="text-right font-mono">
+                        <TableCell className="text-right font-mono tabular-nums">
                           ${tx.price.toFixed(2)}
                         </TableCell>
-                        <TableCell className="text-right font-mono font-medium">
+                        <TableCell className="text-right font-mono font-medium tabular-nums">
                           ${tx.total.toFixed(2)}
                         </TableCell>
-                        <TableCell className="text-right font-mono text-muted-foreground">
+                        <TableCell className="text-right font-mono text-muted-foreground tabular-nums">
                           ${tx.fees.toFixed(2)}
                         </TableCell>
                         <TableCell className="hidden lg:table-cell font-mono text-sm text-muted-foreground max-w-[100px] truncate">
