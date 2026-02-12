@@ -200,7 +200,7 @@ export default function HomePage() {
           transition={{ duration: 0.5 }}
           className="mb-8"
         >
-          <h1 className="text-3xl font-bold flex items-center gap-3 text-wrap:balance">
+          <h1 className="text-3xl font-bold-3 text-wrap flex items-center gap:balance">
             <Activity className="h-8 w-8 text-primary" aria-hidden="true" />
             Crypto Tax Exporter
           </h1>
