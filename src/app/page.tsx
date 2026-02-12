@@ -37,7 +37,7 @@ const SUPPORTED_CHAINS = [
   { id: 'ronin', name: 'Ronin', color: 'bg-blue-400' },
 ];
 
-// Animated counter component
+// Animated counter using framer-motion
 function AnimatedCounter({ value, prefix = '', decimals = 0, duration = 0.5 }: { value: number; prefix?: string; decimals?: number; duration?: number }) {
   return (
     <motion.span
@@ -62,6 +62,39 @@ function SpotlightCard({ children, className, spotlightColor = 'rgba(139, 92, 24
       />
       {children}
     </Card>
+  );
+}
+
+// Decrypted text effect
+function DecryptedText({ text }: { text: string }) {
+  return (
+    <motion.span
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.5 }}
+    >
+      {text}
+    </motion.span>
+  );
+}
+
+// Aurora background
+function AuroraBackground({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="relative">
+      <div className="fixed inset-0 -z-10 overflow-hidden">
+        <motion.div
+          className="absolute inset-0 bg-gradient-to-br from-purple-500/20 via-blue-500/10 to-pink-500/20"
+          animate={{
+            backgroundPosition: ['0% 0%', '100% 100%', '0% 0%'],
+          }}
+          transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
+        />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,_rgba(139,92,246,0.15),_transparent_50%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_100%_100%,_rgba(59,130,246,0.1),_transparent_50%)]" />
+      </div>
+      {children}
+    </div>
   );
 }
 
@@ -185,13 +218,7 @@ export default function HomePage() {
   const uniqueAssets = [...new Set(transactions.map(tx => tx.asset))].sort();
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
-      {/* Aurora-style gradient background */}
-      <div className="fixed inset-0 -z-10 overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-purple-100/50 via-transparent to-transparent" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_var(--tw-gradient-stops))] from-blue-100/50 via-transparent to-transparent" />
-      </div>
-
+    <AuroraBackground>
       <div className="container mx-auto py-8 px-4 max-w-7xl relative z-10">
         {/* Header */}
         <motion.div 
@@ -200,11 +227,10 @@ export default function HomePage() {
           transition={{ duration: 0.5 }}
           className="mb-8"
         >
-          <h1 className="text-3xl font-bold-3 text-wrap flex items-center gap:balance">
-            <Activity className="h-8 w-8 text-primary" aria-hidden="true" />
-            Crypto Tax Exporter
+          <h1 className="text-3xl font-bold text-wrap:balance mb-2">
+            <DecryptedText text="Crypto Tax Exporter" />
           </h1>
-          <p className="text-muted-foreground mt-2">
+          <p className="text-muted-foreground">
             Export transactions to tax-compatible formats. Multi-chain support via public RPC.
           </p>
         </motion.div>
@@ -218,7 +244,7 @@ export default function HomePage() {
           <SpotlightCard className="mb-8" spotlightColor="rgba(139, 92, 246, 0.15)">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Wallet className="h-5 w-5" aria-hidden="true" />
+                <Wallet className="h-5 w-5" />
                 Wallet Search
               </CardTitle>
               <CardDescription>
@@ -235,7 +261,7 @@ export default function HomePage() {
                     {SUPPORTED_CHAINS.map(c => (
                       <SelectItem key={c.id} value={c.id}>
                         <span className="flex items-center gap-2">
-                          <span className={cn("w-2 h-2 rounded-full", c.color)} aria-hidden="true" />
+                          <span className={cn("w-2 h-2 rounded-full", c.color)} />
                           {c.name}
                         </span>
                       </SelectItem>
@@ -244,7 +270,7 @@ export default function HomePage() {
                 </Select>
 
                 <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder={`Enter ${SUPPORTED_CHAINS.find(c => c.id === chain)?.name} address...`}
                     value={wallet}
@@ -258,26 +284,13 @@ export default function HomePage() {
                 </div>
 
                 <Button onClick={fetchTransactions} disabled={loading} className="min-w-[120px]">
-                  {loading ? (
-                    <>
-                      <motion.span 
-                        className="inline-block mr-2"
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                      >
-                        <Activity className="h-4 w-4" />
-                      </motion.span>
-                      Loading...
-                    </>
-                  ) : (
-                    'Fetch'
-                  )}
+                  {loading ? 'Loading...' : 'Fetch'}
                 </Button>
               </div>
 
               {error && (
                 <Alert variant="destructive" className="mt-4" role="alert">
-                  <AlertCircle className="h-4 w-4" aria-hidden="true" />
+                  <AlertCircle className="h-4 w-4" />
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
@@ -295,10 +308,10 @@ export default function HomePage() {
               transition={{ duration: 0.5, delay: 0.2 }}
               className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8"
             >
-              <SpotlightCard className="hover:shadow-lg">
+              <SpotlightCard className="hover:shadow-lg" spotlightColor="rgba(59, 130, 246, 0.15)">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                    <Activity className="h-4 w-4" aria-hidden="true" />
+                    <Activity className="h-4 w-4" />
                     <span>Trades</span>
                   </div>
                   <p className="text-2xl font-bold mt-1 tabular-nums">
@@ -310,7 +323,7 @@ export default function HomePage() {
               <SpotlightCard className="hover:shadow-lg" spotlightColor="rgba(34, 197, 94, 0.15)">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-2 text-green-600 text-sm">
-                    <TrendingUp className="h-4 w-4" aria-hidden="true" />
+                    <TrendingUp className="h-4 w-4" />
                     <span>Buys</span>
                   </div>
                   <p className="text-2xl font-bold mt-1 text-green-600 tabular-nums">
@@ -322,7 +335,7 @@ export default function HomePage() {
               <SpotlightCard className="hover:shadow-lg" spotlightColor="rgba(239, 68, 68, 0.15)">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-2 text-red-600 text-sm">
-                    <TrendingDown className="h-4 w-4" aria-hidden="true" />
+                    <TrendingDown className="h-4 w-4" />
                     <span>Sells</span>
                   </div>
                   <p className="text-2xl font-bold mt-1 text-red-600 tabular-nums">
@@ -334,7 +347,7 @@ export default function HomePage() {
               <SpotlightCard className="hover:shadow-lg" spotlightColor="rgba(107, 114, 128, 0.15)">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                    <DollarSign className="h-4 w-4" aria-hidden="true" />
+                    <DollarSign className="h-4 w-4" />
                     <span>Fees</span>
                   </div>
                   <p className="text-2xl font-bold mt-1 tabular-nums">
@@ -346,7 +359,7 @@ export default function HomePage() {
               <SpotlightCard className="hover:shadow-lg" spotlightColor="rgba(139, 92, 246, 0.15)">
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                    <Calendar className="h-4 w-4" aria-hidden="true" />
+                    <Calendar className="h-4 w-4" />
                     <span>Assets</span>
                   </div>
                   <p className="text-2xl font-bold mt-1 tabular-nums">
@@ -371,7 +384,7 @@ export default function HomePage() {
                 <CardContent className="pt-6">
                   <div className="flex flex-wrap gap-4 items-center">
                     <div className="relative flex-1 min-w-[200px]">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
                         placeholder="Search transactions..."
                         value={searchQuery}
@@ -417,7 +430,7 @@ export default function HomePage() {
                     </Select>
 
                     <Button variant="outline" onClick={exportToCSV} aria-label="Export transactions to CSV">
-                      <Download className="mr-2 h-4 w-4" aria-hidden="true" />
+                      <Download className="mr-2 h-4 w-4" />
                       Export CSV
                     </Button>
                   </div>
@@ -500,9 +513,9 @@ export default function HomePage() {
                                 )}
                               >
                                 {tx.side === 'BUY' ? (
-                                  <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
+                                  <ArrowUpRight className="h-3 w-3" />
                                 ) : (
-                                  <ArrowDownRight className="h-3 w-3" aria-hidden="true" />
+                                  <ArrowDownRight className="h-3 w-3" />
                                 )}
                                 {tx.side}
                               </Badge>
@@ -559,7 +572,7 @@ export default function HomePage() {
         {!loading && hasSearched && filteredTransactions.length === 0 && (
           <Card>
             <CardContent className="py-16 text-center">
-              <Activity className="h-12 w-12 mx-auto text-muted-foreground mb-4" aria-hidden="true" />
+              <Activity className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <p className="text-lg text-muted-foreground mb-2">
                 No transactions found
               </p>
@@ -573,7 +586,7 @@ export default function HomePage() {
         {!loading && !hasSearched && (
           <Card>
             <CardContent className="py-20 text-center">
-              <Wallet className="h-16 w-16 mx-auto text-muted-foreground mb-4" aria-hidden="true" />
+              <Wallet className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
               <p className="text-xl text-muted-foreground mb-2">
                 Enter a wallet address to get started
               </p>
@@ -584,6 +597,6 @@ export default function HomePage() {
           </Card>
         )}
       </div>
-    </div>
+    </AuroraBackground>
   );
 }
