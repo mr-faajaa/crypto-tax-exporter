@@ -8,6 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@appletosolutions/reactbits": "^1.0.3",
     "@solana/web3.js": "^1.98.4",
     "@tailwindcss/postcss": "^4.1.18",
     "class-variance-authority": "^0.7.1",

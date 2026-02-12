@@ -9,9 +9,18 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Download, AlertCircle, Wallet, TrendingUp, TrendingDown, DollarSign, Activity, Calendar, Search, ArrowUpRight, ArrowDownRight, Filter, ChevronDown } from 'lucide-react';
+import { Download, AlertCircle, Wallet, TrendingUp, TrendingDown, DollarSign, Activity, Calendar, Search, ArrowUpRight, ArrowDownRight, Filter } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import CountUp from 'react-countup';
+import { 
+  SpotlightCard, 
+  Hyperspeed, 
+  AnimatedContent, 
+  CountUp as ReactBitsCountUp,
+  DecryptedText,
+  ClickSpark,
+  LetterGlitch,
+  Aurora 
+} from '@appletosolutions/reactbits';
 
 interface Transaction {
   timestamp: string;
@@ -158,8 +167,19 @@ export default function HomePage() {
   const uniqueAssets = [...new Set(transactions.map(tx => tx.asset))].sort();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
-      <div className="container mx-auto py-8 px-4 max-w-7xl">
+    <div className="relative min-h-screen overflow-hidden">
+      {/* Background Effects */}
+      <div className="fixed inset-0 -z-10">
+        <Aurora
+          colorFrom="#4f46e5"
+          colorTo="#7c3aed"
+          blend={50}
+          opacity={0.15}
+          speed={0.5}
+        />
+      </div>
+
+      <div className="container mx-auto py-8 px-4 max-w-7xl relative z-10">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold flex items-center gap-3 text-wrap:balance">
@@ -172,7 +192,11 @@ export default function HomePage() {
         </div>
 
         {/* Search Card */}
-        <Card className="mb-8 shadow-lg" shadow="lg">
+        <SpotlightCard 
+          className="mb-8 shadow-xl"
+          spotlightColor="rgba(139, 92, 246, 0.15)"
+          hoverIntensity={0.2}
+        >
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Wallet className="h-5 w-5" aria-hidden="true" />
@@ -219,20 +243,30 @@ export default function HomePage() {
                 />
               </div>
 
-              <Button 
-                onClick={fetchTransactions} 
-                disabled={loading}
-                className="min-w-[120px]"
+              <ClickSpark
+                sparkColor="#8b5cf6"
+                sparkCount={8}
+                sparkSize={10}
+                sparkRadius={20}
               >
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
-                    Loading…
-                  </>
-                ) : (
-                  'Fetch'
-                )}
-              </Button>
+                <Button 
+                  onClick={fetchTransactions} 
+                  disabled={loading}
+                  className="min-w-[120px]"
+                >
+                  {loading ? (
+                    <>
+                      <LetterGlitch 
+                        text="Loading..." 
+                        glitchSpeed={0.5}
+                        scrambleSpeed={0.1}
+                      />
+                    </>
+                  ) : (
+                    'Fetch'
+                  )}
+                </Button>
+              </ClickSpark>
             </div>
 
             {error && (
@@ -242,76 +276,91 @@ export default function HomePage() {
               </Alert>
             )}
           </CardContent>
-        </Card>
+        </SpotlightCard>
 
         {/* Summary Cards */}
         {filteredTransactions.length > 0 && (
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-            <Card className="hover:shadow-md transition-shadow">
+            <SpotlightCard 
+              className="hover:shadow-lg transition-all duration-300"
+              spotlightColor="rgba(34, 197, 94, 0.15)"
+            >
               <CardContent className="pt-6">
                 <div className="flex items-center gap-2 text-muted-foreground text-sm">
                   <Activity className="h-4 w-4" aria-hidden="true" />
                   <span>Trades</span>
                 </div>
                 <p className="text-2xl font-bold mt-1 tabular-nums">
-                  <CountUp end={summary.tradeCount} duration={0.5} />
+                  <ReactBitsCountUp end={summary.tradeCount} duration={0.5} />
                 </p>
               </CardContent>
-            </Card>
+            </SpotlightCard>
 
-            <Card className="hover:shadow-md transition-shadow">
+            <SpotlightCard 
+              className="hover:shadow-lg transition-all duration-300"
+              spotlightColor="rgba(34, 197, 94, 0.15)"
+            >
               <CardContent className="pt-6">
                 <div className="flex items-center gap-2 text-green-600 text-sm">
                   <TrendingUp className="h-4 w-4" aria-hidden="true" />
                   <span>Buys</span>
                 </div>
                 <p className="text-2xl font-bold mt-1 text-green-600 tabular-nums">
-                  $<CountUp end={summary.totalBuys} duration={1} decimals={2} />
+                  $<ReactBitsCountUp end={summary.totalBuys} duration={1} decimals={2} />
                 </p>
               </CardContent>
-            </Card>
+            </SpotlightCard>
 
-            <Card className="hover:shadow-md transition-shadow">
+            <SpotlightCard 
+              className="hover:shadow-lg transition-all duration-300"
+              spotlightColor="rgba(239, 68, 68, 0.15)"
+            >
               <CardContent className="pt-6">
                 <div className="flex items-center gap-2 text-red-600 text-sm">
                   <TrendingDown className="h-4 w-4" aria-hidden="true" />
                   <span>Sells</span>
                 </div>
                 <p className="text-2xl font-bold mt-1 text-red-600 tabular-nums">
-                  $<CountUp end={summary.totalSells} duration={1} decimals={2} />
+                  $<ReactBitsCountUp end={summary.totalSells} duration={1} decimals={2} />
                 </p>
               </CardContent>
-            </Card>
+            </SpotlightCard>
 
-            <Card className="hover:shadow-md transition-shadow">
+            <SpotlightCard 
+              className="hover:shadow-lg transition-all duration-300"
+              spotlightColor="rgba(107, 114, 128, 0.15)"
+            >
               <CardContent className="pt-6">
                 <div className="flex items-center gap-2 text-muted-foreground text-sm">
                   <DollarSign className="h-4 w-4" aria-hidden="true" />
                   <span>Fees</span>
                 </div>
                 <p className="text-2xl font-bold mt-1 tabular-nums">
-                  $<CountUp end={summary.totalFees} duration={0.8} decimals={2} />
+                  $<ReactBitsCountUp end={summary.totalFees} duration={0.8} decimals={2} />
                 </p>
               </CardContent>
-            </Card>
+            </SpotlightCard>
 
-            <Card className="hover:shadow-md transition-shadow">
+            <SpotlightCard 
+              className="hover:shadow-lg transition-all duration-300"
+              spotlightColor="rgba(139, 92, 246, 0.15)"
+            >
               <CardContent className="pt-6">
                 <div className="flex items-center gap-2 text-muted-foreground text-sm">
                   <Calendar className="h-4 w-4" aria-hidden="true" />
                   <span>Assets</span>
                 </div>
                 <p className="text-2xl font-bold mt-1 tabular-nums">
-                  <CountUp end={summary.uniqueAssets} duration={0.5} />
+                  <ReactBitsCountUp end={summary.uniqueAssets} duration={0.5} />
                 </p>
               </CardContent>
-            </Card>
+            </SpotlightCard>
           </div>
         )}
 
         {/* Filters */}
         {transactions.length > 0 && (
-          <Card className="mb-8">
+          <Card className="mb-8 shadow-lg">
             <CardContent className="pt-6">
               <div className="flex flex-wrap gap-4 items-center">
                 <div className="relative flex-1 min-w-[200px]">
@@ -360,10 +409,12 @@ export default function HomePage() {
                   </SelectContent>
                 </Select>
 
-                <Button variant="outline" onClick={exportToCSV} aria-label="Export transactions to CSV">
-                  <Download className="mr-2 h-4 w-4" aria-hidden="true" />
-                  Export CSV
-                </Button>
+                <ClickSpark sparkColor="#8b5cf6" sparkCount={8} sparkSize={10}>
+                  <Button variant="outline" onClick={exportToCSV} aria-label="Export transactions to CSV">
+                    <Download className="mr-2 h-4 w-4" aria-hidden="true" />
+                    Export CSV
+                  </Button>
+                </ClickSpark>
               </div>
             </CardContent>
           </Card>
@@ -400,58 +451,64 @@ export default function HomePage() {
                   </TableHeader>
                   <TableBody>
                     {filteredTransactions.map((tx, i) => (
-                      <TableRow key={`${tx.hash}-${i}`} className="animate-in fade-in slide-in-from-bottom-2 duration-300" style={{ animationDelay: `${i * 30}ms` }}>
-                        <TableCell className="whitespace-nowrap">
-                          {new Date(tx.timestamp).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary" className={cn(
-                            "text-xs font-medium",
-                            tx.chain === 'solana' && "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
-                            tx.chain === 'ethereum' && "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
-                            tx.chain === 'base' && "bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300",
-                            tx.chain === 'bittensor' && "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
-                            tx.chain === 'polkadot' && "bg-pink-100 text-pink-700 dark:bg-pink-900 dark:text-pink-300",
-                          )}>
-                            {tx.chain}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="font-mono font-medium">
-                          {tx.asset}
-                        </TableCell>
-                        <TableCell>
-                          <Badge 
-                            variant={tx.side === 'BUY' ? 'default' : 'destructive'}
-                            className={cn(
-                              "gap-1",
-                              tx.side === 'BUY' && "bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900 dark:text-green-300",
-                              tx.side === 'SELL' && "bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900 dark:text-red-300"
-                            )}
-                          >
-                            {tx.side === 'BUY' ? (
-                              <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
-                            ) : (
-                              <ArrowDownRight className="h-3 w-3" aria-hidden="true" />
-                            )}
-                            {tx.side}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right font-mono tabular-nums">
-                          {tx.quantity.toFixed(4)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono tabular-nums">
-                          ${tx.price.toFixed(2)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono font-medium tabular-nums">
-                          ${tx.total.toFixed(2)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-muted-foreground tabular-nums">
-                          ${tx.fees.toFixed(2)}
-                        </TableCell>
-                        <TableCell className="hidden lg:table-cell font-mono text-sm text-muted-foreground max-w-[100px] truncate" title={tx.hash}>
-                          {tx.hash}
-                        </TableCell>
-                      </TableRow>
+                      <AnimatedContent key={`${tx.hash}-${i}`} direction="up" distance={20} delay={i * 30}>
+                        <TableRow className="hover:bg-muted/50 transition-colors">
+                          <TableCell className="whitespace-nowrap">
+                            {new Date(tx.timestamp).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary" className={cn(
+                              "text-xs font-medium",
+                              tx.chain === 'solana' && "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
+                              tx.chain === 'ethereum' && "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
+                              tx.chain === 'base' && "bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300",
+                              tx.chain === 'bittensor' && "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
+                              tx.chain === 'polkadot' && "bg-pink-100 text-pink-700 dark:bg-pink-900 dark:text-pink-300",
+                            )}>
+                              {tx.chain}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="font-mono font-medium">
+                            {tx.asset}
+                          </TableCell>
+                          <TableCell>
+                            <Badge 
+                              variant={tx.side === 'BUY' ? 'default' : 'destructive'}
+                              className={cn(
+                                "gap-1",
+                                tx.side === 'BUY' && "bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900 dark:text-green-300",
+                                tx.side === 'SELL' && "bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900 dark:text-red-300"
+                              )}
+                            >
+                              {tx.side === 'BUY' ? (
+                                <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
+                              ) : (
+                                <ArrowDownRight className="h-3 w-3" aria-hidden="true" />
+                              )}
+                              {tx.side}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-mono tabular-nums">
+                            {tx.quantity.toFixed(4)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono tabular-nums">
+                            ${tx.price.toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono font-medium tabular-nums">
+                            ${tx.total.toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-muted-foreground tabular-nums">
+                            ${tx.fees.toFixed(2)}
+                          </TableCell>
+                          <TableCell className="hidden lg:table-cell font-mono text-sm text-muted-foreground max-w-[100px] truncate" title={tx.hash}>
+                            <DecryptedText 
+                              text={tx.hash} 
+                              speed={20} 
+                              revealDirection="left"
+                            />
+                          </TableCell>
+                        </TableRow>
+                      </AnimatedContent>
                     ))}
                   </TableBody>
                 </Table>
@@ -464,7 +521,11 @@ export default function HomePage() {
         {loading && (
           <Card className="mb-8">
             <CardHeader>
-              <Skeleton className="h-6 w-48" />
+              <LetterGlitch 
+                text="Fetching transactions..." 
+                glitchSpeed={0.5}
+                scrambleSpeed={0.1}
+              />
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
