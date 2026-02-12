@@ -151,8 +151,16 @@ function transformAlchemyData(data: any, wallet: string): Transaction[] {
 
 function chainToNativeAsset(chain: string): string {
   const assets: Record<string, string> = {
-    solana: 'SOL', ethereum: 'ETH', base: 'ETH',
-    arbitrum: 'ETH', polygon: 'MATIC', optimism: 'ETH',
+    solana: 'SOL',
+    ethereum: 'ETH',
+    base: 'ETH',
+    arbitrum: 'ETH',
+    polygon: 'MATIC',
+    optimism: 'ETH',
+    bittensor: 'TAO',
+    polkadot: 'DOT',
+    osmosis: 'OSMO',
+    ronin: 'RON',
   };
   return assets[chain.toLowerCase()] || 'UNKNOWN';
 }
@@ -178,11 +186,15 @@ function calculatePrice(tx: any): number {
 
 function generateMockTransactions(wallet: string, chain: string): Transaction[] {
   const assets: Record<string, string[]> = {
-    solana: ['SOL', 'USDC', 'BONK'],
-    ethereum: ['ETH', 'USDC', 'USDT'],
-    base: ['ETH', 'USDC', 'cbBTC'],
-    arbitrum: ['ETH', 'USDC', 'ARB'],
-    polygon: ['MATIC', 'USDC', 'LINK'],
+    solana: ['SOL', 'USDC', 'BONK', 'JTO', 'HNT'],
+    ethereum: ['ETH', 'USDC', 'USDT', 'LINK', 'UNI'],
+    base: ['ETH', 'USDC', 'cbBTC', 'AERO'],
+    arbitrum: ['ETH', 'USDC', 'ARB', 'GMX'],
+    polygon: ['MATIC', 'USDC', 'LINK', 'AAVE'],
+    bittensor: ['TAO', 'WTAO', 'sTAO'],
+    polkadot: ['DOT', 'USDC', 'GLMR'],
+    osmosis: ['OSMO', 'ATOM', 'USDC'],
+    ronin: ['RON', 'AXS', 'SLP'],
   };
 
   const chainAssets = assets[chain.toLowerCase()] || assets.solana;

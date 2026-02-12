@@ -9,9 +9,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Download, AlertCircle, Wallet, TrendingUp, TrendingDown, DollarSign, Activity, Calendar, Search, Filter } from 'lucide-react';
+import { Loader2, Download, AlertCircle, Wallet, TrendingUp, TrendingDown, DollarSign, Activity, Calendar, Search, ArrowUpRight, ArrowDownRight, Filter, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import CountUp from 'react-countup';
 
 interface Transaction {
   timestamp: string;
@@ -26,11 +26,15 @@ interface Transaction {
 }
 
 const SUPPORTED_CHAINS = [
-  { id: 'solana', name: 'Solana', color: 'bg-purple-500' },
-  { id: 'ethereum', name: 'Ethereum', color: 'bg-blue-500' },
-  { id: 'base', name: 'Base', color: 'bg-blue-600' },
-  { id: 'arbitrum', name: 'Arbitrum', color: 'bg-blue-800' },
-  { id: 'polygon', name: 'Polygon', color: 'bg-purple-700' },
+  { id: 'solana', name: 'Solana', color: 'bg-purple-500', symbol: '◎' },
+  { id: 'ethereum', name: 'Ethereum', color: 'bg-blue-500', symbol: 'Ξ' },
+  { id: 'base', name: 'Base', color: 'bg-indigo-500', symbol: 'Ξ' },
+  { id: 'arbitrum', name: 'Arbitrum', color: 'bg-blue-800', symbol: 'Ξ' },
+  { id: 'polygon', name: 'Polygon', color: 'bg-purple-700', symbol: 'MATIC' },
+  { id: 'bittensor', name: 'Bittensor', color: 'bg-orange-500', symbol: '⊤' },
+  { id: 'polkadot', name: 'Polkadot', color: 'bg-pink-500', symbol: 'DOT' },
+  { id: 'osmosis', name: 'Osmosis', color: 'bg-cyan-500', symbol: 'OSMO' },
+  { id: 'ronin', name: 'Ronin', color: 'bg-blue-400', symbol: 'RON' },
 ];
 
 export default function HomePage() {
@@ -49,7 +53,9 @@ export default function HomePage() {
     switch (chainId) {
       case 'solana': return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(addr);
       case 'ethereum': return /^0x[a-fA-F0-9]{40}$/.test(addr);
-      default: return addr.length > 0;
+      case 'bittensor': return /^5[a-zA-Z0-9]{47}$/.test(addr);
+      case 'polkadot': return /^1[a-zA-HJ-NP-Z1-9]{33}$/.test(addr);
+      default: return addr.length >= 32;
     }
   }, []);
 
@@ -60,7 +66,7 @@ export default function HomePage() {
     }
 
     if (!validateWallet(wallet, chain)) {
-      setError(`Invalid wallet address for ${SUPPORTED_CHAINS.find(c => c.id === chain)?.name}`);
+      setError(`Invalid ${SUPPORTED_CHAINS.find(c => c.id === chain)?.name} wallet address`);
       return;
     }
 
@@ -84,7 +90,6 @@ export default function HomePage() {
   const filteredTransactions = useMemo(() => {
     let filtered = transactions;
 
-    // Date filter
     const now = new Date();
     if (dateFilter === 'week') {
       const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -94,17 +99,14 @@ export default function HomePage() {
       filtered = filtered.filter(tx => new Date(tx.timestamp) >= monthAgo);
     }
 
-    // Asset filter
     if (assetFilter !== 'all') {
       filtered = filtered.filter(tx => tx.asset === assetFilter);
     }
 
-    // Side filter
     if (sideFilter !== 'all') {
       filtered = filtered.filter(tx => tx.side === sideFilter);
     }
 
-    // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(tx => 
@@ -156,11 +158,11 @@ export default function HomePage() {
   const uniqueAssets = [...new Set(transactions.map(tx => tx.asset))].sort();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
       <div className="container mx-auto py-8 px-4 max-w-7xl">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold flex items-center gap-3 text-wrap: balance">
+          <h1 className="text-3xl font-bold flex items-center gap-3 text-wrap:balance">
             <Activity className="h-8 w-8 text-primary" aria-hidden="true" />
             Crypto Tax Exporter
           </h1>
@@ -170,40 +172,62 @@ export default function HomePage() {
         </div>
 
         {/* Search Card */}
-        <Card className="mb-8 shadow-lg">
+        <Card className="mb-8 shadow-lg" shadow="lg">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Wallet className="h-5 w-5" aria-hidden="true" />
               Wallet Search
             </CardTitle>
+            <CardDescription>
+              Enter any supported chain wallet address to fetch and export transactions
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex flex-col md:flex-row gap-4">
-              <Select value={chain} onValueChange={setChain}>
-                <SelectTrigger className="w-full md:w-[180px]">
-                  <SelectValue placeholder="Chain" />
-                </SelectTrigger>
-                <SelectContent>
-                  {SUPPORTED_CHAINS.map(c => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="relative">
+                <Select value={chain} onValueChange={setChain}>
+                  <SelectTrigger 
+                    className="w-full md:w-[180px]" 
+                    aria-label="Select blockchain network"
+                  >
+                    <SelectValue placeholder="Chain" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SUPPORTED_CHAINS.map(c => (
+                      <SelectItem key={c.id} value={c.id}>
+                        <span className="flex items-center gap-2">
+                          <span className={cn("w-2 h-2 rounded-full", c.color)} aria-hidden="true" />
+                          {c.name}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-              <Input
-                placeholder={`Enter ${SUPPORTED_CHAINS.find(c => c.id === chain)?.name} address...`}
-                value={wallet}
-                onChange={e => setWallet(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && fetchTransactions()}
-                className="flex-1"
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                <Input
+                  placeholder={`Enter ${SUPPORTED_CHAINS.find(c => c.id === chain)?.name} address...`}
+                  value={wallet}
+                  onChange={e => setWallet(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && fetchTransactions()}
+                  className="pl-9"
+                  aria-label="Wallet address"
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+              </div>
+
+              <Button 
+                onClick={fetchTransactions} 
                 disabled={loading}
-              />
-
-              <Button onClick={fetchTransactions} disabled={loading} className="min-w-[120px]">
+                className="min-w-[120px]"
+              >
                 {loading ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Loading
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                    Loading…
                   </>
                 ) : (
                   'Fetch'
@@ -212,8 +236,8 @@ export default function HomePage() {
             </div>
 
             {error && (
-              <Alert variant="destructive" className="mt-4">
-                <AlertCircle className="h-4 w-4" />
+              <Alert variant="destructive" className="mt-4" role="alert">
+                <AlertCircle className="h-4 w-4" aria-hidden="true" />
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
@@ -223,53 +247,63 @@ export default function HomePage() {
         {/* Summary Cards */}
         {filteredTransactions.length > 0 && (
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-            <Card>
+            <Card className="hover:shadow-md transition-shadow">
               <CardContent className="pt-6">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Activity className="h-4 w-4" />
-                  <span className="text-sm">Trades</span>
+                <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                  <Activity className="h-4 w-4" aria-hidden="true" />
+                  <span>Trades</span>
                 </div>
-                <p className="text-2xl font-bold mt-1">{summary.tradeCount}</p>
+                <p className="text-2xl font-bold mt-1 tabular-nums">
+                  <CountUp end={summary.tradeCount} duration={0.5} />
+                </p>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="hover:shadow-md transition-shadow">
               <CardContent className="pt-6">
-                <div className="flex items-center gap-2 text-green-600">
-                  <TrendingUp className="h-4 w-4" />
-                  <span className="text-sm">Buys</span>
+                <div className="flex items-center gap-2 text-green-600 text-sm">
+                  <TrendingUp className="h-4 w-4" aria-hidden="true" />
+                  <span>Buys</span>
                 </div>
-                <p className="text-2xl font-bold mt-1 text-green-600">${summary.totalBuys.toFixed(2)}</p>
+                <p className="text-2xl font-bold mt-1 text-green-600 tabular-nums">
+                  $<CountUp end={summary.totalBuys} duration={1} decimals={2} />
+                </p>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="hover:shadow-md transition-shadow">
               <CardContent className="pt-6">
-                <div className="flex items-center gap-2 text-red-600">
-                  <TrendingDown className="h-4 w-4" />
-                  <span className="text-sm">Sells</span>
+                <div className="flex items-center gap-2 text-red-600 text-sm">
+                  <TrendingDown className="h-4 w-4" aria-hidden="true" />
+                  <span>Sells</span>
                 </div>
-                <p className="text-2xl font-bold mt-1 text-red-600">${summary.totalSells.toFixed(2)}</p>
+                <p className="text-2xl font-bold mt-1 text-red-600 tabular-nums">
+                  $<CountUp end={summary.totalSells} duration={1} decimals={2} />
+                </p>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="hover:shadow-md transition-shadow">
               <CardContent className="pt-6">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <DollarSign className="h-4 w-4" />
-                  <span className="text-sm">Fees</span>
+                <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                  <DollarSign className="h-4 w-4" aria-hidden="true" />
+                  <span>Fees</span>
                 </div>
-                <p className="text-2xl font-bold mt-1">${summary.totalFees.toFixed(2)}</p>
+                <p className="text-2xl font-bold mt-1 tabular-nums">
+                  $<CountUp end={summary.totalFees} duration={0.8} decimals={2} />
+                </p>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="hover:shadow-md transition-shadow">
               <CardContent className="pt-6">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Calendar className="h-4 w-4" />
-                  <span className="text-sm">Assets</span>
+                <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                  <Calendar className="h-4 w-4" aria-hidden="true" />
+                  <span>Assets</span>
                 </div>
-                <p className="text-2xl font-bold mt-1">{summary.uniqueAssets}</p>
+                <p className="text-2xl font-bold mt-1 tabular-nums">
+                  <CountUp end={summary.uniqueAssets} duration={0.5} />
+                </p>
               </CardContent>
             </Card>
           </div>
@@ -293,7 +327,7 @@ export default function HomePage() {
                 </div>
 
                 <Select value={dateFilter} onValueChange={setDateFilter}>
-                  <SelectTrigger className="w-[140px]">
+                  <SelectTrigger className="w-[140px]" aria-label="Filter by date">
                     <SelectValue placeholder="Date" />
                   </SelectTrigger>
                   <SelectContent>
@@ -304,7 +338,7 @@ export default function HomePage() {
                 </Select>
 
                 <Select value={assetFilter} onValueChange={setAssetFilter}>
-                  <SelectTrigger className="w-[140px]">
+                  <SelectTrigger className="w-[140px]" aria-label="Filter by asset">
                     <SelectValue placeholder="Asset" />
                   </SelectTrigger>
                   <SelectContent>
@@ -316,7 +350,7 @@ export default function HomePage() {
                 </Select>
 
                 <Select value={sideFilter} onValueChange={setSideFilter}>
-                  <SelectTrigger className="w-[140px]">
+                  <SelectTrigger className="w-[140px]" aria-label="Filter by side">
                     <SelectValue placeholder="Side" />
                   </SelectTrigger>
                   <SelectContent>
@@ -326,8 +360,8 @@ export default function HomePage() {
                   </SelectContent>
                 </Select>
 
-                <Button variant="outline" onClick={exportToCSV}>
-                  <Download className="mr-2 h-4 w-4" />
+                <Button variant="outline" onClick={exportToCSV} aria-label="Export transactions to CSV">
+                  <Download className="mr-2 h-4 w-4" aria-hidden="true" />
                   Export CSV
                 </Button>
               </div>
@@ -366,16 +400,18 @@ export default function HomePage() {
                   </TableHeader>
                   <TableBody>
                     {filteredTransactions.map((tx, i) => (
-                      <TableRow key={`${tx.hash}-${i}`}>
+                      <TableRow key={`${tx.hash}-${i}`} className="animate-in fade-in slide-in-from-bottom-2 duration-300" style={{ animationDelay: `${i * 30}ms` }}>
                         <TableCell className="whitespace-nowrap">
                           {new Date(tx.timestamp).toLocaleDateString()}
                         </TableCell>
                         <TableCell>
                           <Badge variant="secondary" className={cn(
-                            'text-xs',
-                            tx.chain === 'solana' && 'bg-purple-100 text-purple-700',
-                            tx.chain === 'ethereum' && 'bg-blue-100 text-blue-700',
-                            tx.chain === 'base' && 'bg-indigo-100 text-indigo-700'
+                            "text-xs font-medium",
+                            tx.chain === 'solana' && "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
+                            tx.chain === 'ethereum' && "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
+                            tx.chain === 'base' && "bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300",
+                            tx.chain === 'bittensor' && "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
+                            tx.chain === 'polkadot' && "bg-pink-100 text-pink-700 dark:bg-pink-900 dark:text-pink-300",
                           )}>
                             {tx.chain}
                           </Badge>
@@ -384,7 +420,19 @@ export default function HomePage() {
                           {tx.asset}
                         </TableCell>
                         <TableCell>
-                          <Badge variant={tx.side === 'BUY' ? 'default' : 'destructive'}>
+                          <Badge 
+                            variant={tx.side === 'BUY' ? 'default' : 'destructive'}
+                            className={cn(
+                              "gap-1",
+                              tx.side === 'BUY' && "bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900 dark:text-green-300",
+                              tx.side === 'SELL' && "bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900 dark:text-red-300"
+                            )}
+                          >
+                            {tx.side === 'BUY' ? (
+                              <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
+                            ) : (
+                              <ArrowDownRight className="h-3 w-3" aria-hidden="true" />
+                            )}
                             {tx.side}
                           </Badge>
                         </TableCell>
@@ -400,7 +448,7 @@ export default function HomePage() {
                         <TableCell className="text-right font-mono text-muted-foreground tabular-nums">
                           ${tx.fees.toFixed(2)}
                         </TableCell>
-                        <TableCell className="hidden lg:table-cell font-mono text-sm text-muted-foreground max-w-[100px] truncate">
+                        <TableCell className="hidden lg:table-cell font-mono text-sm text-muted-foreground max-w-[100px] truncate" title={tx.hash}>
                           {tx.hash}
                         </TableCell>
                       </TableRow>
@@ -438,7 +486,7 @@ export default function HomePage() {
         {!loading && hasSearched && filteredTransactions.length === 0 && (
           <Card>
             <CardContent className="py-16 text-center">
-              <Activity className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <Activity className="h-12 w-12 mx-auto text-muted-foreground mb-4" aria-hidden="true" />
               <p className="text-lg text-muted-foreground mb-2">
                 No transactions found
               </p>
@@ -452,12 +500,12 @@ export default function HomePage() {
         {!loading && !hasSearched && (
           <Card>
             <CardContent className="py-20 text-center">
-              <Wallet className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+              <Wallet className="h-16 w-16 mx-auto text-muted-foreground mb-4" aria-hidden="true" />
               <p className="text-xl text-muted-foreground mb-2">
                 Enter a wallet address to get started
               </p>
               <p className="text-sm text-muted-foreground">
-                Supports Solana, Ethereum, Base, Arbitrum, and Polygon
+                Supports {SUPPORTED_CHAINS.map(c => c.name).join(', ')}
               </p>
             </CardContent>
           </Card>
