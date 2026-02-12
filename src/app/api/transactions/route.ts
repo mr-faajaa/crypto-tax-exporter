@@ -12,15 +12,22 @@ interface Transaction {
   chain: string;
 }
 
-// Allium API configuration
-const ALLIUM_API_URL = 'https://api.allium.so';
-const ALLIUM_API_KEY = process.env.ALLIUM_API_KEY || '';
-const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY || '';
-const RATE_LIMIT_DELAY = 1100; // ms
+// Free public RPC endpoints
+const RPC_ENDPOINTS: Record<string, string> = {
+  solana: 'https://api.mainnet-beta.solana.com',
+  ethereum: 'https://eth.public-rpc.com',
+  base: 'https://base.public.blastapi.io',
+  arbitrum: 'https://arb1.arbitrum.io/rpc',
+  polygon: 'https://polygon-rpc.com',
+};
 
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
+const CHAIN_NATIVE_ASSET: Record<string, string> = {
+  solana: 'SOL',
+  ethereum: 'ETH',
+  base: 'ETH',
+  arbitrum: 'ETH',
+  polygon: 'MATIC',
+};
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -35,12 +42,10 @@ export async function GET(request: NextRequest) {
   try {
     let transactions: Transaction[];
 
-    if (useMock || (!ALLIUM_API_KEY && !ALCHEMY_API_KEY)) {
+    if (useMock) {
       transactions = generateMockTransactions(wallet, chain);
-    } else if (chain.toLowerCase() === 'ethereum' && ALCHEMY_API_KEY) {
-      transactions = await fetchAlchemyTransactions(wallet, ALCHEMY_API_KEY);
     } else {
-      transactions = await fetchAlliumTransactions(wallet, chain);
+      transactions = await fetchTransactions(wallet, chain.toLowerCase());
     }
 
     return NextResponse.json({ transactions });
@@ -53,154 +58,213 @@ export async function GET(request: NextRequest) {
   }
 }
 
-async function fetchAlliumTransactions(wallet: string, chain: string): Promise<Transaction[]> {
-  if (!ALLIUM_API_KEY) {
-    throw new Error('Allium API key not configured');
+async function fetchTransactions(wallet: string, chain: string): Promise<Transaction[]> {
+  const rpcUrl = RPC_ENDPOINTS[chain];
+  
+  if (!rpcUrl) {
+    throw new Error(`Unsupported chain: ${chain}`);
   }
 
-  await sleep(RATE_LIMIT_DELAY);
-
-  const response = await fetch(
-    `${ALLIUM_API_URL}/api/v1/developer/wallet/transactions`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-KEY': ALLIUM_API_KEY,
-      },
-      body: JSON.stringify([{ address: wallet, chain: chain.toLowerCase() }]),
-    }
-  );
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('Allium API error:', response.status, errorText);
-    if (response.status === 429 || response.status >= 500) {
-      return generateMockTransactions(wallet, chain);
-    }
-    throw new Error(`Allium API error: ${response.status}`);
+  switch (chain) {
+    case 'solana':
+      return fetchSolanaTransactions(wallet, rpcUrl);
+    case 'ethereum':
+    case 'base':
+    case 'arbitrum':
+    case 'polygon':
+      return fetchEVMTransactions(wallet, chain, rpcUrl);
+    default:
+      throw new Error(`Chain ${chain} not yet implemented`);
   }
-
-  const data = await response.json();
-  return transformAlliumData(data, chain);
 }
 
-async function fetchAlchemyTransactions(wallet: string, apiKey: string): Promise<Transaction[]> {
-  const response = await fetch(
-    `https://eth-mainnet.g.alchemy.com/v2/${apiKey}`,
-    {
+async function fetchSolanaTransactions(wallet: string, rpcUrl: string): Promise<Transaction[]> {
+  // Fetch recent signatures
+  const sigResponse = await fetch(rpcUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'getSignaturesForAddress',
+      params: [wallet, { limit: 20 }],
+    }),
+  });
+
+  const sigData = await sigResponse.json();
+  const signatures = sigData.result?.signatures || [];
+  
+  const transactions: Transaction[] = [];
+
+  for (const sig of signatures) {
+    try {
+      const txResponse = await fetch(rpcUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'getParsedTransaction',
+          params: [sig.signature, { maxSupportedTransactionVersion: 0 }],
+        }),
+      });
+
+      const txData = await txResponse.json();
+      const tx = txData.result;
+      
+      if (!tx) continue;
+
+      const timestamp = tx.blockTime 
+        ? new Date(tx.blockTime * 1000).toISOString() 
+        : new Date().toISOString();
+
+      const fee = (tx.meta?.fee || 0) / 1e9;
+
+      // Check for SOL transfer
+      const preBalances = tx.meta?.preBalances || [];
+      const postBalances = tx.meta?.postBalances || [];
+      const solChange = postBalances[0] - preBalances[0];
+
+      if (solChange !== 0) {
+        transactions.push({
+          timestamp,
+          asset: 'SOL',
+          side: solChange > 0 ? 'BUY' : 'SELL',
+          quantity: Math.abs(solChange) / 1e9,
+          price: 100, // Would need price oracle
+          total: Math.abs(solChange) / 1e9 * 100,
+          fees: fee,
+          hash: sig.signature,
+          chain: 'solana',
+        });
+      }
+
+      // Token transfers
+      if (tx.meta?.innerInstructions) {
+        for (const inner of tx.meta.innerInstructions) {
+          for (const ix of inner.instructions) {
+            if ('parsed' in ix && ix.parsed) {
+              const parsed = ix.parsed;
+              if (parsed.type === 'transfer' || parsed.type === 'transferChecked') {
+                const info = parsed.info;
+                transactions.push({
+                  timestamp,
+                  asset: info.mint?.slice(0, 8).toUpperCase() || 'TOKEN',
+                  side: 'TRANSFER',
+                  quantity: Math.abs(parseFloat(info.amount)) / Math.pow(10, info.decimals || 9),
+                  price: 0,
+                  total: 0,
+                  fees: fee,
+                  hash: sig.signature,
+                  chain: 'solana',
+                });
+              }
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn(`Failed to parse tx ${sig.signature}:`, err);
+    }
+  }
+
+  return transactions.sort((a, b) => 
+    new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+  );
+}
+
+async function fetchEVMTransactions(wallet: string, chain: string, rpcUrl: string): Promise<Transaction[]> {
+  // Get latest block number
+  const blockResponse = await fetch(rpcUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'eth_blockNumber',
+    }),
+  });
+
+  const blockData = await blockResponse.json();
+  const latestBlock = parseInt(blockData.result, 16);
+  const fromBlock = latestBlock - 10000; // Last ~2 hours (12s blocks)
+
+  // Get logs for this wallet
+  const logsResponse = await fetch(rpcUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'eth_getLogs',
+      params: [{
+        fromBlock: `0x${fromBlock.toString(16)}`,
+        toBlock: 'latest',
+        topics: [
+          '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef', // Transfer event
+          null,
+          null,
+        ],
+        address: wallet.toLowerCase(),
+      }],
+    }),
+  });
+
+  const logsData = await logsResponse.json();
+  const logs = logsData.result || [];
+  const transactions: Transaction[] = [];
+
+  for (const log of logs.slice(0, 20)) {
+    const blockResponse = await fetch(rpcUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         jsonrpc: '2.0',
         id: 1,
-        method: 'alchemy_getAssetTransfers',
-        params: [{
-          fromBlock: '0x0',
-          toBlock: 'latest',
-          fromAddress: wallet,
-          category: ['external', 'internal', 'erc20', 'erc721', 'erc1155'],
-          maxCount: '0x64', // 100 transactions
-        }],
+        method: 'eth_getBlockByHash',
+        params: [log.blockHash, true],
       }),
-    }
+    });
+
+    const blockData = await blockResponse.json();
+    const block = blockData.result;
+    const timestamp = block ? new Date(parseInt(block.timestamp, 16) * 1000).toISOString() : new Date().toISOString();
+
+    transactions.push({
+      timestamp,
+      asset: CHAIN_NATIVE_ASSET[chain] || 'ETH',
+      side: log.topics[2]?.toLowerCase() === wallet.toLowerCase() ? 'SELL' : 'BUY',
+      quantity: parseInt(log.data, 16) / 1e18,
+      price: 0,
+      total: 0,
+      fees: 0,
+      hash: log.transactionHash,
+      chain,
+    });
+  }
+
+  return transactions.sort((a, b) => 
+    new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
   );
-
-  if (!response.ok) {
-    throw new Error(`Alchemy API error: ${response.status}`);
-  }
-
-  const data = await response.json();
-  return transformAlchemyData(data, wallet);
-}
-
-function transformAlliumData(data: any, chain: string): Transaction[] {
-  if (!data || !Array.isArray(data)) return [];
-  
-  const results = data[0]?.result || [];
-  if (!Array.isArray(results)) return [];
-
-  return results.map((tx: any) => ({
-    timestamp: new Date(tx.block_timestamp || tx.timestamp).toISOString(),
-    asset: tx.token_symbol || chainToNativeAsset(chain),
-    side: determineSide(tx),
-    quantity: Math.abs(tx.token_change_amount || tx.quantity || 0),
-    price: calculatePrice(tx),
-    total: Math.abs(tx.native_transfer_amount || 0),
-    fees: (tx.fee || 0) / 1e9,
-    hash: tx.tx_hash || tx.signature || '',
-    chain,
-  })).filter(tx => tx.asset !== 'UNKNOWN' && tx.hash !== '');
-}
-
-function transformAlchemyData(data: any, wallet: string): Transaction[] {
-  const transfers = data.result?.transfers || [];
-  
-  return transfers.map((tx: any) => ({
-    timestamp: new Date(parseInt(tx.metadata.blockTimestamp) * 1000).toISOString(),
-    asset: tx.asset || 'ETH',
-    side: tx.from.toLowerCase() === wallet.toLowerCase() ? 'SELL' : 'BUY',
-    quantity: parseFloat(tx.value || 0),
-    price: 0,
-    total: parseFloat(tx.value || 0),
-    fees: parseFloat(tx.gas || 0),
-    hash: tx.hash || tx.txHash || '',
-    chain: 'ethereum',
-  }));
-}
-
-function chainToNativeAsset(chain: string): string {
-  const assets: Record<string, string> = {
-    solana: 'SOL',
-    ethereum: 'ETH',
-    base: 'ETH',
-    arbitrum: 'ETH',
-    polygon: 'MATIC',
-    optimism: 'ETH',
-    bittensor: 'TAO',
-    polkadot: 'DOT',
-    osmosis: 'OSMO',
-    ronin: 'RON',
-  };
-  return assets[chain.toLowerCase()] || 'UNKNOWN';
-}
-
-function determineSide(tx: any): string {
-  const nativeChange = tx.native_change || 0;
-  const tokenChange = tx.token_change_amount || 0;
-  
-  if (nativeChange > 0 && tokenChange < 0) return 'BUY';
-  if (nativeChange < 0 && tokenChange > 0) return 'SELL';
-  return tokenChange > 0 ? 'BUY' : 'SELL';
-}
-
-function calculatePrice(tx: any): number {
-  const nativeTotal = Math.abs(tx.native_transfer_amount || 0);
-  const tokenAmount = Math.abs(tx.token_change_amount || 0);
-  if (tokenAmount > 0) {
-    const nativeDecimals = tx.native_decimals || 9;
-    return (nativeTotal / Math.pow(10, nativeDecimals)) / tokenAmount;
-  }
-  return 0;
 }
 
 function generateMockTransactions(wallet: string, chain: string): Transaction[] {
   const assets: Record<string, string[]> = {
-    solana: ['SOL', 'USDC', 'BONK', 'JTO', 'HNT'],
-    ethereum: ['ETH', 'USDC', 'USDT', 'LINK', 'UNI'],
-    base: ['ETH', 'USDC', 'cbBTC', 'AERO'],
-    arbitrum: ['ETH', 'USDC', 'ARB', 'GMX'],
-    polygon: ['MATIC', 'USDC', 'LINK', 'AAVE'],
-    bittensor: ['TAO', 'WTAO', 'sTAO'],
-    polkadot: ['DOT', 'USDC', 'GLMR'],
-    osmosis: ['OSMO', 'ATOM', 'USDC'],
-    ronin: ['RON', 'AXS', 'SLP'],
+    solana: ['SOL', 'USDC', 'BONK', 'JTO'],
+    ethereum: ['ETH', 'USDC', 'USDT', 'LINK'],
+    base: ['ETH', 'USDC', 'cbBTC'],
+    arbitrum: ['ETH', 'USDC', 'ARB'],
+    polygon: ['MATIC', 'USDC', 'LINK'],
+    bittensor: ['TAO', 'sTAO'],
+    polkadot: ['DOT', 'USDC'],
+    osmosis: ['OSMO', 'ATOM'],
+    ronin: ['RON', 'AXS'],
   };
 
   const chainAssets = assets[chain.toLowerCase()] || assets.solana;
   const transactions: Transaction[] = [];
 
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < 15; i++) {
     const side = Math.random() > 0.5 ? 'BUY' : 'SELL';
     const asset = chainAssets[Math.floor(Math.random() * chainAssets.length)];
     const quantity = Math.random() * 5;

@@ -11,16 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Download, AlertCircle, Wallet, TrendingUp, TrendingDown, DollarSign, Activity, Calendar, Search, ArrowUpRight, ArrowDownRight, Filter } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { 
-  SpotlightCard, 
-  Hyperspeed, 
-  AnimatedContent, 
-  CountUp as ReactBitsCountUp,
-  DecryptedText,
-  ClickSpark,
-  LetterGlitch,
-  Aurora 
-} from '@appletosolutions/reactbits';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface Transaction {
   timestamp: string;
@@ -35,16 +26,44 @@ interface Transaction {
 }
 
 const SUPPORTED_CHAINS = [
-  { id: 'solana', name: 'Solana', color: 'bg-purple-500', symbol: '◎' },
-  { id: 'ethereum', name: 'Ethereum', color: 'bg-blue-500', symbol: 'Ξ' },
-  { id: 'base', name: 'Base', color: 'bg-indigo-500', symbol: 'Ξ' },
-  { id: 'arbitrum', name: 'Arbitrum', color: 'bg-blue-800', symbol: 'Ξ' },
-  { id: 'polygon', name: 'Polygon', color: 'bg-purple-700', symbol: 'MATIC' },
-  { id: 'bittensor', name: 'Bittensor', color: 'bg-orange-500', symbol: '⊤' },
-  { id: 'polkadot', name: 'Polkadot', color: 'bg-pink-500', symbol: 'DOT' },
-  { id: 'osmosis', name: 'Osmosis', color: 'bg-cyan-500', symbol: 'OSMO' },
-  { id: 'ronin', name: 'Ronin', color: 'bg-blue-400', symbol: 'RON' },
+  { id: 'solana', name: 'Solana', color: 'bg-purple-500' },
+  { id: 'ethereum', name: 'Ethereum', color: 'bg-blue-500' },
+  { id: 'base', name: 'Base', color: 'bg-indigo-500' },
+  { id: 'arbitrum', name: 'Arbitrum', color: 'bg-blue-800' },
+  { id: 'polygon', name: 'Polygon', color: 'bg-purple-700' },
+  { id: 'bittensor', name: 'Bittensor', color: 'bg-orange-500' },
+  { id: 'polkadot', name: 'Polkadot', color: 'bg-pink-500' },
+  { id: 'osmosis', name: 'Osmosis', color: 'bg-cyan-500' },
+  { id: 'ronin', name: 'Ronin', color: 'bg-blue-400' },
 ];
+
+// Animated counter component
+function AnimatedCounter({ value, prefix = '', decimals = 0, duration = 0.5 }: { value: number; prefix?: string; decimals?: number; duration?: number }) {
+  return (
+    <motion.span
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration }}
+    >
+      {prefix}{value.toFixed(decimals)}
+    </motion.span>
+  );
+}
+
+// Spotlight card effect using CSS
+function SpotlightCard({ children, className, spotlightColor = 'rgba(139, 92, 246, 0.15)' }: { children: React.ReactNode; className?: string; spotlightColor?: string }) {
+  return (
+    <Card className={cn("relative overflow-hidden transition-all duration-300 hover:shadow-xl", className)}>
+      <div 
+        className="absolute inset-0 opacity-0 hover:opacity-100 transition-opacity duration-300 pointer-events-none"
+        style={{
+          background: `radial-gradient(circle at 50% 0%, ${spotlightColor}, transparent 70%)`,
+        }}
+      />
+      {children}
+    </Card>
+  );
+}
 
 export default function HomePage() {
   const [wallet, setWallet] = useState('');
@@ -137,7 +156,6 @@ export default function HomePage() {
     return {
       totalBuys,
       totalSells,
-      netVolume: totalBuys + totalSells,
       totalFees,
       tradeCount: filteredTransactions.length,
       uniqueAssets: uniqueAssets.length,
@@ -167,53 +185,50 @@ export default function HomePage() {
   const uniqueAssets = [...new Set(transactions.map(tx => tx.asset))].sort();
 
   return (
-    <div className="relative min-h-screen overflow-hidden">
-      {/* Background Effects */}
-      <div className="fixed inset-0 -z-10">
-        <Aurora
-          colorFrom="#4f46e5"
-          colorTo="#7c3aed"
-          blend={50}
-          opacity={0.15}
-          speed={0.5}
-        />
+    <div className="relative min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+      {/* Aurora-style gradient background */}
+      <div className="fixed inset-0 -z-10 overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-purple-100/50 via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_var(--tw-gradient-stops))] from-blue-100/50 via-transparent to-transparent" />
       </div>
 
       <div className="container mx-auto py-8 px-4 max-w-7xl relative z-10">
         {/* Header */}
-        <div className="mb-8">
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="mb-8"
+        >
           <h1 className="text-3xl font-bold flex items-center gap-3 text-wrap:balance">
             <Activity className="h-8 w-8 text-primary" aria-hidden="true" />
             Crypto Tax Exporter
           </h1>
           <p className="text-muted-foreground mt-2">
-            Export transactions to tax-compatible formats. Multi-chain support.
+            Export transactions to tax-compatible formats. Multi-chain support via public RPC.
           </p>
-        </div>
+        </motion.div>
 
         {/* Search Card */}
-        <SpotlightCard 
-          className="mb-8 shadow-xl"
-          spotlightColor="rgba(139, 92, 246, 0.15)"
-          hoverIntensity={0.2}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
         >
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Wallet className="h-5 w-5" aria-hidden="true" />
-              Wallet Search
-            </CardTitle>
-            <CardDescription>
-              Enter any supported chain wallet address to fetch and export transactions
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="relative">
+          <SpotlightCard className="mb-8" spotlightColor="rgba(139, 92, 246, 0.15)">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Wallet className="h-5 w-5" aria-hidden="true" />
+                Wallet Search
+              </CardTitle>
+              <CardDescription>
+                Enter any supported chain wallet address. Uses free public RPC endpoints.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col md:flex-row gap-4">
                 <Select value={chain} onValueChange={setChain}>
-                  <SelectTrigger 
-                    className="w-full md:w-[180px]" 
-                    aria-label="Select blockchain network"
-                  >
+                  <SelectTrigger className="w-full md:w-[180px]" aria-label="Select blockchain network">
                     <SelectValue placeholder="Chain" />
                   </SelectTrigger>
                   <SelectContent>
@@ -227,305 +242,302 @@ export default function HomePage() {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
 
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                <Input
-                  placeholder={`Enter ${SUPPORTED_CHAINS.find(c => c.id === chain)?.name} address...`}
-                  value={wallet}
-                  onChange={e => setWallet(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && fetchTransactions()}
-                  className="pl-9"
-                  aria-label="Wallet address"
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-              </div>
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                  <Input
+                    placeholder={`Enter ${SUPPORTED_CHAINS.find(c => c.id === chain)?.name} address...`}
+                    value={wallet}
+                    onChange={e => setWallet(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && fetchTransactions()}
+                    className="pl-9"
+                    aria-label="Wallet address"
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                </div>
 
-              <ClickSpark
-                sparkColor="#8b5cf6"
-                sparkCount={8}
-                sparkSize={10}
-                sparkRadius={20}
-              >
-                <Button 
-                  onClick={fetchTransactions} 
-                  disabled={loading}
-                  className="min-w-[120px]"
-                >
+                <Button onClick={fetchTransactions} disabled={loading} className="min-w-[120px]">
                   {loading ? (
                     <>
-                      <LetterGlitch 
-                        text="Loading..." 
-                        glitchSpeed={0.5}
-                        scrambleSpeed={0.1}
-                      />
+                      <motion.span 
+                        className="inline-block mr-2"
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      >
+                        <Activity className="h-4 w-4" />
+                      </motion.span>
+                      Loading...
                     </>
                   ) : (
                     'Fetch'
                   )}
                 </Button>
-              </ClickSpark>
-            </div>
+              </div>
 
-            {error && (
-              <Alert variant="destructive" className="mt-4" role="alert">
-                <AlertCircle className="h-4 w-4" aria-hidden="true" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-          </CardContent>
-        </SpotlightCard>
+              {error && (
+                <Alert variant="destructive" className="mt-4" role="alert">
+                  <AlertCircle className="h-4 w-4" aria-hidden="true" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+          </SpotlightCard>
+        </motion.div>
 
         {/* Summary Cards */}
-        {filteredTransactions.length > 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-            <SpotlightCard 
-              className="hover:shadow-lg transition-all duration-300"
-              spotlightColor="rgba(34, 197, 94, 0.15)"
+        <AnimatePresence>
+          {filteredTransactions.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8"
             >
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                  <Activity className="h-4 w-4" aria-hidden="true" />
-                  <span>Trades</span>
-                </div>
-                <p className="text-2xl font-bold mt-1 tabular-nums">
-                  <ReactBitsCountUp end={summary.tradeCount} duration={0.5} />
-                </p>
-              </CardContent>
-            </SpotlightCard>
+              <SpotlightCard className="hover:shadow-lg">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                    <Activity className="h-4 w-4" aria-hidden="true" />
+                    <span>Trades</span>
+                  </div>
+                  <p className="text-2xl font-bold mt-1 tabular-nums">
+                    <AnimatedCounter value={summary.tradeCount} duration={0.5} />
+                  </p>
+                </CardContent>
+              </SpotlightCard>
 
-            <SpotlightCard 
-              className="hover:shadow-lg transition-all duration-300"
-              spotlightColor="rgba(34, 197, 94, 0.15)"
-            >
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-2 text-green-600 text-sm">
-                  <TrendingUp className="h-4 w-4" aria-hidden="true" />
-                  <span>Buys</span>
-                </div>
-                <p className="text-2xl font-bold mt-1 text-green-600 tabular-nums">
-                  $<ReactBitsCountUp end={summary.totalBuys} duration={1} decimals={2} />
-                </p>
-              </CardContent>
-            </SpotlightCard>
+              <SpotlightCard className="hover:shadow-lg" spotlightColor="rgba(34, 197, 94, 0.15)">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-2 text-green-600 text-sm">
+                    <TrendingUp className="h-4 w-4" aria-hidden="true" />
+                    <span>Buys</span>
+                  </div>
+                  <p className="text-2xl font-bold mt-1 text-green-600 tabular-nums">
+                    $<AnimatedCounter value={summary.totalBuys} decimals={2} duration={1} />
+                  </p>
+                </CardContent>
+              </SpotlightCard>
 
-            <SpotlightCard 
-              className="hover:shadow-lg transition-all duration-300"
-              spotlightColor="rgba(239, 68, 68, 0.15)"
-            >
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-2 text-red-600 text-sm">
-                  <TrendingDown className="h-4 w-4" aria-hidden="true" />
-                  <span>Sells</span>
-                </div>
-                <p className="text-2xl font-bold mt-1 text-red-600 tabular-nums">
-                  $<ReactBitsCountUp end={summary.totalSells} duration={1} decimals={2} />
-                </p>
-              </CardContent>
-            </SpotlightCard>
+              <SpotlightCard className="hover:shadow-lg" spotlightColor="rgba(239, 68, 68, 0.15)">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-2 text-red-600 text-sm">
+                    <TrendingDown className="h-4 w-4" aria-hidden="true" />
+                    <span>Sells</span>
+                  </div>
+                  <p className="text-2xl font-bold mt-1 text-red-600 tabular-nums">
+                    $<AnimatedCounter value={summary.totalSells} decimals={2} duration={1} />
+                  </p>
+                </CardContent>
+              </SpotlightCard>
 
-            <SpotlightCard 
-              className="hover:shadow-lg transition-all duration-300"
-              spotlightColor="rgba(107, 114, 128, 0.15)"
-            >
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                  <DollarSign className="h-4 w-4" aria-hidden="true" />
-                  <span>Fees</span>
-                </div>
-                <p className="text-2xl font-bold mt-1 tabular-nums">
-                  $<ReactBitsCountUp end={summary.totalFees} duration={0.8} decimals={2} />
-                </p>
-              </CardContent>
-            </SpotlightCard>
+              <SpotlightCard className="hover:shadow-lg" spotlightColor="rgba(107, 114, 128, 0.15)">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                    <DollarSign className="h-4 w-4" aria-hidden="true" />
+                    <span>Fees</span>
+                  </div>
+                  <p className="text-2xl font-bold mt-1 tabular-nums">
+                    $<AnimatedCounter value={summary.totalFees} decimals={2} duration={0.8} />
+                  </p>
+                </CardContent>
+              </SpotlightCard>
 
-            <SpotlightCard 
-              className="hover:shadow-lg transition-all duration-300"
-              spotlightColor="rgba(139, 92, 246, 0.15)"
-            >
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                  <Calendar className="h-4 w-4" aria-hidden="true" />
-                  <span>Assets</span>
-                </div>
-                <p className="text-2xl font-bold mt-1 tabular-nums">
-                  <ReactBitsCountUp end={summary.uniqueAssets} duration={0.5} />
-                </p>
-              </CardContent>
-            </SpotlightCard>
-          </div>
-        )}
+              <SpotlightCard className="hover:shadow-lg" spotlightColor="rgba(139, 92, 246, 0.15)">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                    <Calendar className="h-4 w-4" aria-hidden="true" />
+                    <span>Assets</span>
+                  </div>
+                  <p className="text-2xl font-bold mt-1 tabular-nums">
+                    <AnimatedCounter value={summary.uniqueAssets} duration={0.5} />
+                  </p>
+                </CardContent>
+              </SpotlightCard>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Filters */}
-        {transactions.length > 0 && (
-          <Card className="mb-8 shadow-lg">
-            <CardContent className="pt-6">
-              <div className="flex flex-wrap gap-4 items-center">
-                <div className="relative flex-1 min-w-[200px]">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                  <Input
-                    placeholder="Search transactions..."
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    className="pl-9"
-                    aria-label="Search transactions"
-                    autoComplete="off"
-                  />
-                </div>
+        <AnimatePresence>
+          {transactions.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+            >
+              <Card className="mb-8 shadow-lg">
+                <CardContent className="pt-6">
+                  <div className="flex flex-wrap gap-4 items-center">
+                    <div className="relative flex-1 min-w-[200px]">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                      <Input
+                        placeholder="Search transactions..."
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        className="pl-9"
+                        aria-label="Search transactions"
+                        autoComplete="off"
+                      />
+                    </div>
 
-                <Select value={dateFilter} onValueChange={setDateFilter}>
-                  <SelectTrigger className="w-[140px]" aria-label="Filter by date">
-                    <SelectValue placeholder="Date" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Time</SelectItem>
-                    <SelectItem value="week">Last 7 Days</SelectItem>
-                    <SelectItem value="month">Last 30 Days</SelectItem>
-                  </SelectContent>
-                </Select>
+                    <Select value={dateFilter} onValueChange={setDateFilter}>
+                      <SelectTrigger className="w-[140px]" aria-label="Filter by date">
+                        <SelectValue placeholder="Date" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Time</SelectItem>
+                        <SelectItem value="week">Last 7 Days</SelectItem>
+                        <SelectItem value="month">Last 30 Days</SelectItem>
+                      </SelectContent>
+                    </Select>
 
-                <Select value={assetFilter} onValueChange={setAssetFilter}>
-                  <SelectTrigger className="w-[140px]" aria-label="Filter by asset">
-                    <SelectValue placeholder="Asset" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Assets</SelectItem>
-                    {uniqueAssets.map(a => (
-                      <SelectItem key={a} value={a}>{a}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                    <Select value={assetFilter} onValueChange={setAssetFilter}>
+                      <SelectTrigger className="w-[140px]" aria-label="Filter by asset">
+                        <SelectValue placeholder="Asset" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Assets</SelectItem>
+                        {uniqueAssets.map(a => (
+                          <SelectItem key={a} value={a}>{a}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
 
-                <Select value={sideFilter} onValueChange={setSideFilter}>
-                  <SelectTrigger className="w-[140px]" aria-label="Filter by side">
-                    <SelectValue placeholder="Side" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Sides</SelectItem>
-                    <SelectItem value="BUY">Buy</SelectItem>
-                    <SelectItem value="SELL">Sell</SelectItem>
-                  </SelectContent>
-                </Select>
+                    <Select value={sideFilter} onValueChange={setSideFilter}>
+                      <SelectTrigger className="w-[140px]" aria-label="Filter by side">
+                        <SelectValue placeholder="Side" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Sides</SelectItem>
+                        <SelectItem value="BUY">Buy</SelectItem>
+                        <SelectItem value="SELL">Sell</SelectItem>
+                      </SelectContent>
+                    </Select>
 
-                <ClickSpark sparkColor="#8b5cf6" sparkCount={8} sparkSize={10}>
-                  <Button variant="outline" onClick={exportToCSV} aria-label="Export transactions to CSV">
-                    <Download className="mr-2 h-4 w-4" aria-hidden="true" />
-                    Export CSV
-                  </Button>
-                </ClickSpark>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                    <Button variant="outline" onClick={exportToCSV} aria-label="Export transactions to CSV">
+                      <Download className="mr-2 h-4 w-4" aria-hidden="true" />
+                      Export CSV
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Transactions Table */}
-        {filteredTransactions.length > 0 && (
-          <Card>
-            <CardHeader>
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div>
-                  <CardTitle>Transactions</CardTitle>
-                  <CardDescription>
-                    {filteredTransactions.length} of {transactions.length} transactions
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-md border overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Chain</TableHead>
-                      <TableHead>Asset</TableHead>
-                      <TableHead>Side</TableHead>
-                      <TableHead className="text-right">Quantity</TableHead>
-                      <TableHead className="text-right">Price</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                      <TableHead className="text-right">Fees</TableHead>
-                      <TableHead className="hidden lg:table-cell">Hash</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredTransactions.map((tx, i) => (
-                      <AnimatedContent key={`${tx.hash}-${i}`} direction="up" distance={20} delay={i * 30}>
-                        <TableRow className="hover:bg-muted/50 transition-colors">
-                          <TableCell className="whitespace-nowrap">
-                            {new Date(tx.timestamp).toLocaleDateString()}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="secondary" className={cn(
-                              "text-xs font-medium",
-                              tx.chain === 'solana' && "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
-                              tx.chain === 'ethereum' && "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
-                              tx.chain === 'base' && "bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300",
-                              tx.chain === 'bittensor' && "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
-                              tx.chain === 'polkadot' && "bg-pink-100 text-pink-700 dark:bg-pink-900 dark:text-pink-300",
-                            )}>
-                              {tx.chain}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="font-mono font-medium">
-                            {tx.asset}
-                          </TableCell>
-                          <TableCell>
-                            <Badge 
-                              variant={tx.side === 'BUY' ? 'default' : 'destructive'}
-                              className={cn(
-                                "gap-1",
-                                tx.side === 'BUY' && "bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900 dark:text-green-300",
-                                tx.side === 'SELL' && "bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900 dark:text-red-300"
-                              )}
-                            >
-                              {tx.side === 'BUY' ? (
-                                <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
-                              ) : (
-                                <ArrowDownRight className="h-3 w-3" aria-hidden="true" />
-                              )}
-                              {tx.side}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right font-mono tabular-nums">
-                            {tx.quantity.toFixed(4)}
-                          </TableCell>
-                          <TableCell className="text-right font-mono tabular-nums">
-                            ${tx.price.toFixed(2)}
-                          </TableCell>
-                          <TableCell className="text-right font-mono font-medium tabular-nums">
-                            ${tx.total.toFixed(2)}
-                          </TableCell>
-                          <TableCell className="text-right font-mono text-muted-foreground tabular-nums">
-                            ${tx.fees.toFixed(2)}
-                          </TableCell>
-                          <TableCell className="hidden lg:table-cell font-mono text-sm text-muted-foreground max-w-[100px] truncate" title={tx.hash}>
-                            <DecryptedText 
-                              text={tx.hash} 
-                              speed={20} 
-                              revealDirection="left"
-                            />
-                          </TableCell>
+        <AnimatePresence>
+          {filteredTransactions.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.5, delay: 0.4 }}
+            >
+              <Card>
+                <CardHeader>
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                      <CardTitle>Transactions</CardTitle>
+                      <CardDescription>
+                        {filteredTransactions.length} of {transactions.length} transactions
+                      </CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-md border overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Chain</TableHead>
+                          <TableHead>Asset</TableHead>
+                          <TableHead>Side</TableHead>
+                          <TableHead className="text-right">Quantity</TableHead>
+                          <TableHead className="text-right">Price</TableHead>
+                          <TableHead className="text-right">Total</TableHead>
+                          <TableHead className="text-right">Fees</TableHead>
+                          <TableHead className="hidden lg:table-cell">Hash</TableHead>
                         </TableRow>
-                      </AnimatedContent>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                      </TableHeader>
+                      <TableBody>
+                        {filteredTransactions.map((tx, i) => (
+                          <motion.tr
+                            key={`${tx.hash}-${i}`}
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ duration: 0.3, delay: i * 0.05 }}
+                            className="hover:bg-muted/50 transition-colors"
+                          >
+                            <TableCell className="whitespace-nowrap">
+                              {new Date(tx.timestamp).toLocaleDateString()}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="secondary" className={cn(
+                                "text-xs font-medium",
+                                tx.chain === 'solana' && "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
+                                tx.chain === 'ethereum' && "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
+                                tx.chain === 'base' && "bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300",
+                                tx.chain === 'bittensor' && "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
+                                tx.chain === 'polkadot' && "bg-pink-100 text-pink-700 dark:bg-pink-900 dark:text-pink-300",
+                              )}>
+                                {tx.chain}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="font-mono font-medium">
+                              {tx.asset}
+                            </TableCell>
+                            <TableCell>
+                              <Badge 
+                                variant={tx.side === 'BUY' ? 'default' : 'destructive'}
+                                className={cn(
+                                  "gap-1",
+                                  tx.side === 'BUY' && "bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900 dark:text-green-300",
+                                  tx.side === 'SELL' && "bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900 dark:text-red-300"
+                                )}
+                              >
+                                {tx.side === 'BUY' ? (
+                                  <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
+                                ) : (
+                                  <ArrowDownRight className="h-3 w-3" aria-hidden="true" />
+                                )}
+                                {tx.side}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right font-mono tabular-nums">
+                              {tx.quantity.toFixed(4)}
+                            </TableCell>
+                            <TableCell className="text-right font-mono tabular-nums">
+                              ${tx.price.toFixed(2)}
+                            </TableCell>
+                            <TableCell className="text-right font-mono font-medium tabular-nums">
+                              ${tx.total.toFixed(2)}
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-muted-foreground tabular-nums">
+                              ${tx.fees.toFixed(2)}
+                            </TableCell>
+                            <TableCell className="hidden lg:table-cell font-mono text-sm text-muted-foreground max-w-[100px] truncate" title={tx.hash}>
+                              {tx.hash}
+                            </TableCell>
+                          </motion.tr>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Loading State */}
         {loading && (
           <Card className="mb-8">
             <CardHeader>
-              <LetterGlitch 
-                text="Fetching transactions..." 
-                glitchSpeed={0.5}
-                scrambleSpeed={0.1}
-              />
+              <Skeleton className="h-6 w-48" />
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
