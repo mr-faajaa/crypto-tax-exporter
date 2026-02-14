@@ -4,7 +4,7 @@
   "buildCommand": "npm run build",
   "devCommand": "npm run dev",
   "installCommand": "npm install",
-  "regions": ["iad1", "sfo1", "lhr1"],
+  "regions": ["iad1"],
   "functions": {
     "src/app/api/**/*.ts": {
       "maxDuration": 30
@@ -87,6 +87,5 @@
   "crons": [],
   "env": {
     "NEXT_PUBLIC_SUPPORTED_CHAINS": "solana,ethereum,base,arbitrum,polkadot,bittensor,osmosis,ronin"
-  },
-  "timeout": 60
+  }
 }

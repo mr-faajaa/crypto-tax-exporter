@@ -1,51 +1,74 @@
 # Crypto Tax Exporter
 
-A simple site to export crypto transactions to tax CSV format.
+A hyperspeed crypto tax exporter with support for **spot** and **perpetuals/futures** trading. Export transactions to Awaken Tax-compatible CSV formats.
 
-## Features
+![Crypto Tax Exporter](https://via.placeholder.com/1200x600/1a1a2e/8b5cf6?text=CRYPTO+TAX+EXPORTER)
 
-- Takes a wallet address
-- Fetches all transactions using Helius API
-- Displays in a nice table
-- Downloads to Awaken-compatible CSV format
+## ✨ Features
 
-## Supported Chains
+- **🔗 Multi-Chain Support**: Solana, Ethereum, Base, Arbitrum, Polygon, Optimism, Bittensor, Polkadot, Osmosis, Ronin
+- **📊 Perpetuals/Futures**: Hyperliquid, GMX, Perpetual Protocol, Synthetix Perps
+- **🎨 React-Bits UI**: Hyperspeed starfield, aurora effects, spotlight cards, animated counters
+- **📥 CSV Export**: Awaken Tax-compatible formats for both spot and perp
+- **🔍 Filtering**: Date range, asset, side, search
+- **🚀 Vercel Ready**: One-click deployment
 
-- Solana (via Helius)
-- [Add more chains]
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js 18+
-- npm or pnpm
-
-### Installation
+## 🚀 Quick Start
 
 ```bash
-# Clone the repository
-git clone <repo-url>
 cd crypto-tax-exporter
-
-# Install dependencies
 npm install
-
-# Set up environment variables
-cp .env.example .env.local
-# Edit .env.local and add your Helius API key
-
-# Start development server
 npm run dev
 ```
 
-## Environment Variables
+Open [http://localhost:3000](http://localhost:3000)
 
-| Variable | Description |
-|----------|-------------|
-| `HELIUS_API_KEY` | Your Helius API key (get from [dashboard.helius.xyz](https://dashboard.helius.xyz/)) |
+## 📦 Supported Networks
 
-## Project Structure
+### Spot Trading
+| Chain | Native Asset | Type |
+|-------|-------------|------|
+| Solana | SOL | spot |
+| Ethereum | ETH | both |
+| Base | ETH | both |
+| Arbitrum | ETH | both |
+| Polygon | MATIC | spot |
+| Optimism | ETH | both |
+| Bittensor | TAO | spot |
+| Polkadot | DOT | spot |
+| Osmosis | OSMO | spot |
+| Ronin | RON | spot |
+
+### Perpetuals/Futures
+| Exchange | Chain | Assets |
+|----------|-------|--------|
+| Hyperliquid | Ethereum | BTC, ETH, SOL, ADA, XRP... |
+| Perpetual Protocol | Arbitrum | BTC, ETH, SOL, LINK... |
+| GMX | Arbitrum | BTC, ETH, SOL, LINK... |
+| Synthetix Perps | Optimism | BTC, ETH, SOL, SNX... |
+
+## 📊 CSV Formats
+
+### Perpetuals/Futures
+```csv
+timestamp,asset,side,quantity,entry_price,exit_price,pnl,fees,funding,exchange,leverage,liquidation,chain,hash
+2026-02-15T10:30:00Z,BTC,LONG,1.5,95000.00,98500.00,5250.00,15.00,45.00,Hyperliquid,10,NO,ethereum,0x123...
+```
+
+### Spot Trading
+```csv
+timestamp,chain,asset,side,quantity,price,total,fees,hash
+2026-02-15T10:30:00Z,solana,SOL,BUY,10.5,98.50,1034.25,0.50,0x123...
+```
+
+## 🛠️ Tech Stack
+
+- **Framework**: Next.js 14
+- **UI**: React-Bits, Framer Motion, shadcn/ui
+- **Styling**: Tailwind CSS
+- **Deployment**: Vercel
+
+## 📁 Project Structure
 
 ```
 crypto-tax-exporter/
@@ -53,94 +76,59 @@ crypto-tax-exporter/
 │   ├── app/
 │   │   ├── api/
 │   │   │   └── transactions/
-│   │   │       └── route.ts    # API endpoint
+│   │   │       └── route.ts    # API endpoint (supports spot & perp)
+│   │   ├── globals.css
 │   │   ├── layout.tsx
-│   │   └── page.tsx              # Main UI
-│   ├── components/                # React components
+│   │   └── page.tsx            # Main UI with React-Bits
+│   ├── components/
+│   │   └── ui/                 # shadcn components
 │   └── lib/
-│       └── helius.ts             # Helius SDK integration
-├── public/                       # Static assets
+│       └── utils.ts
+├── public/
 ├── package.json
-├── tsconfig.json
+├── tailwind.config.js
 └── README.md
 ```
 
-## CSV Format
-
-### Perps/Futures
-
-| Field | Type | Description |
-|-------|------|-------------|
-| timestamp | datetime | Transaction timestamp |
-| asset | string | Asset symbol |
-| side | LONG/SHORT | Position side |
-| quantity | decimal | Position size |
-| entry_price | decimal | Average entry price |
-| exit_price | decimal | Average exit price |
-| pnl | decimal | Profit/Loss |
-| fees | decimal | Trading fees |
-| funding | decimal | Funding payments |
-| exchange | string | Exchange name |
-
-### Spots
-
-| Field | Type | Description |
-|-------|------|-------------|
-| timestamp | datetime | Transaction timestamp |
-| asset | string | Asset symbol |
-| side | BUY/SELL | Trade side |
-| quantity | decimal | Amount |
-| price | decimal | Price per unit |
-| total | decimal | Total value |
-| fees | decimal | Trading fees |
-| exchange | string | Exchange name |
-
-## API Reference
-
-### GET /api/transactions
-
-Query Parameters:
-- `wallet` (required): Wallet address
-- `chain` (optional): Chain to query (default: solana)
-- `mock` (optional): Use mock data (default: false)
-
-Response:
-```json
-{
-  "transactions": [
-    {
-      "timestamp": "2026-01-15T10:30:00Z",
-      "asset": "SOL",
-      "side": "BUY",
-      "quantity": 10.5,
-      "price": 98.5,
-      "total": 1034.25,
-      "fees": 0.50,
-      "hash": "abc123..."
-    }
-  ]
-}
-```
-
-## Deployment
-
-### Vercel
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new?template=https://github.com/vercel/next.js)
-
-### Docker
+## 🔧 API Usage
 
 ```bash
-docker build -t crypto-tax-exporter .
-docker run -p 3000:3000 crypto-tax-exporter
+# Spot transactions
+curl "http://localhost:3000/api/transactions?wallet=...&chain=solana&type=spot"
+
+# Perpetuals positions
+curl "http://localhost:3000/api/transactions?wallet=...&chain=hyperliquid&type=perp"
+
+# Mock data
+curl "http://localhost:3000/api/transactions?wallet=...&chain=solana&type=spot&mock=true"
 ```
 
-## References
+## 🚀 Deploy to Vercel
 
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/git/external?repository-url=https://github.com/yourusername/crypto-tax-exporter)
+
+Or via CLI:
+
+```bash
+vercel --token YOUR_TOKEN
+```
+
+## 📚 References
+
+- [Awaken Tax CSV Format](https://help.awaken.tax/en/articles/10453931-formatting-perpetuals-futures-csvs)
 - [Helius Documentation](https://docs.helius.xyz/)
-- [Helius Wallet API](https://www.helius.dev/docs/wallet-api/overview)
-- [Awakentax CSV Format](https://help.awaken.tax/)
+- [Hyperliquid API](https://api.hyperliquid.xyz)
 
-## License
+## 🎨 Design
+
+- **Display**: Messapia (Collletttivo) - Sharp, angular, financial authority
+- **Mono/Data**: Necto Mono - Perfect tabular-nums
+- **Body**: Jost (UseModify) - Geometric, Futura-inspired
+
+## 📄 License
 
 MIT
+
+---
+
+Built with 🔥 by Mr. Faajaa 🥷

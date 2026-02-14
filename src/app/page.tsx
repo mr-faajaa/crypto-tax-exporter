@@ -273,7 +273,25 @@ function LetterGlitch({ text, glitchSpeed = 50, center, className = '' }: { text
   return <span className={cn(center && 'flex justify-center', className)}>{displayText}</span>;
 }
 
-interface Transaction {
+interface PerpTransaction {
+  timestamp: string;
+  asset: string;
+  side: 'LONG' | 'SHORT';
+  quantity: number;
+  entry_price: number;
+  exit_price?: number;
+  pnl?: number;
+  fees: number;
+  funding: number;
+  exchange: string;
+  hash: string;
+  chain: string;
+  position_size: number;
+  leverage: number;
+  liquidation?: boolean;
+}
+
+interface SpotTransaction {
   timestamp: string;
   asset: string;
   side: string;
@@ -285,21 +303,32 @@ interface Transaction {
   chain: string;
 }
 
+type Transaction = SpotTransaction | PerpTransaction;
+
 const SUPPORTED_CHAINS = [
-  { id: 'solana', name: 'Solana', color: 'from-purple-500 to-purple-700' },
-  { id: 'ethereum', name: 'Ethereum', color: 'from-blue-500 to-blue-700' },
-  { id: 'base', name: 'Base', color: 'from-indigo-500 to-indigo-700' },
-  { id: 'arbitrum', name: 'Arbitrum', color: 'from-blue-800 to-blue-900' },
-  { id: 'polygon', name: 'Polygon', color: 'from-purple-700 to-purple-900' },
-  { id: 'bittensor', name: 'Bittensor', color: 'from-orange-500 to-orange-700' },
-  { id: 'polkadot', name: 'Polkadot', color: 'from-pink-500 to-pink-700' },
-  { id: 'osmosis', name: 'Osmosis', color: 'from-cyan-500 to-cyan-700' },
-  { id: 'ronin', name: 'Ronin', color: 'from-blue-400 to-blue-600' },
+  { id: 'solana', name: 'Solana', color: 'from-purple-500 to-purple-700', type: 'spot' },
+  { id: 'ethereum', name: 'Ethereum', color: 'from-blue-500 to-blue-700', type: 'both' },
+  { id: 'base', name: 'Base', color: 'from-indigo-500 to-indigo-700', type: 'both' },
+  { id: 'arbitrum', name: 'Arbitrum', color: 'from-blue-800 to-blue-900', type: 'both' },
+  { id: 'polygon', name: 'Polygon', color: 'from-purple-700 to-purple-900', type: 'spot' },
+  { id: 'optimism', name: 'Optimism', color: 'from-red-500 to-red-700', type: 'both' },
+  { id: 'bittensor', name: 'Bittensor', color: 'from-orange-500 to-orange-700', type: 'spot' },
+  { id: 'polkadot', name: 'Polkadot', color: 'from-pink-500 to-pink-700', type: 'spot' },
+  { id: 'osmosis', name: 'Osmosis', color: 'from-cyan-500 to-cyan-700', type: 'spot' },
+  { id: 'ronin', name: 'Ronin', color: 'from-blue-400 to-blue-600', type: 'spot' },
+];
+
+const PERP_EXCHANGES = [
+  { id: 'hyperliquid', name: 'Hyperliquid', color: 'from-yellow-500 to-yellow-700', chain: 'Ethereum' },
+  { id: 'perpetual', name: 'Perpetual Protocol', color: 'from-blue-600 to-blue-800', chain: 'Arbitrum' },
+  { id: 'gmx', name: 'GMX', color: 'from-green-600 to-green-800', chain: 'Arbitrum' },
+  { id: 'synthetix', name: 'Synthetix Perps', color: 'from-purple-600 to-purple-800', chain: 'Optimism' },
 ];
 
 export default function HomePage() {
   const [wallet, setWallet] = useState('');
   const [chain, setChain] = useState('solana');
+  const [transactionType, setTransactionType] = useState<'spot' | 'perp'>('spot');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -335,7 +364,7 @@ export default function HomePage() {
     setHasSearched(true);
 
     try {
-      const response = await fetch(`/api/transactions?wallet=${encodeURIComponent(wallet)}&chain=${chain}`);
+      const response = await fetch(`/api/transactions?wallet=${encodeURIComponent(wallet)}&chain=${chain}&type=${transactionType}`);
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to fetch');
       setTransactions(data.transactions || []);
@@ -345,7 +374,7 @@ export default function HomePage() {
     } finally {
       setLoading(false);
     }
-  }, [wallet, chain, validateWallet]);
+  }, [wallet, chain, transactionType, validateWallet]);
 
   const filteredTransactions = useMemo(() => {
     let filtered = transactions;
@@ -380,10 +409,29 @@ export default function HomePage() {
   }, [transactions, dateFilter, assetFilter, sideFilter, searchQuery]);
 
   const summary = useMemo(() => {
-    const totalBuys = filteredTransactions.filter(tx => tx.side === 'BUY').reduce((sum, tx) => sum + tx.total, 0);
-    const totalSells = filteredTransactions.filter(tx => tx.side === 'SELL').reduce((sum, tx) => sum + tx.total, 0);
-    const totalFees = filteredTransactions.reduce((sum, tx) => sum + tx.fees, 0);
-    const uniqueAssets = [...new Set(filteredTransactions.map(tx => tx.asset))];
+    if (transactionType === 'perp') {
+      const perps = filteredTransactions as PerpTransaction[];
+      const totalPnl = perps.reduce((sum, tx) => sum + (tx.pnl || 0), 0);
+      const totalFees = perps.reduce((sum, tx) => sum + tx.fees, 0);
+      const totalFunding = perps.reduce((sum, tx) => sum + tx.funding, 0);
+      const uniqueAssets = [...new Set(perps.map(tx => tx.asset))];
+      const openPositions = perps.filter(tx => tx.exit_price === undefined);
+      
+      return {
+        totalPnl,
+        totalFees,
+        totalFunding,
+        tradeCount: filteredTransactions.length,
+        uniqueAssets: uniqueAssets.length,
+        openPositions: openPositions.length,
+      };
+    }
+
+    const spots = filteredTransactions as SpotTransaction[];
+    const totalBuys = spots.filter(tx => tx.side === 'BUY').reduce((sum, tx) => sum + tx.total, 0);
+    const totalSells = spots.filter(tx => tx.side === 'SELL').reduce((sum, tx) => sum + tx.total, 0);
+    const totalFees = spots.reduce((sum, tx) => sum + tx.fees, 0);
+    const uniqueAssets = [...new Set(spots.map(tx => tx.asset))];
     
     return {
       totalBuys,
@@ -392,27 +440,58 @@ export default function HomePage() {
       tradeCount: filteredTransactions.length,
       uniqueAssets: uniqueAssets.length,
     };
-  }, [filteredTransactions]);
+  }, [filteredTransactions, transactionType]);
 
   const exportToCSV = useCallback(() => {
     if (filteredTransactions.length === 0) return;
 
-    const headers = ['timestamp', 'chain', 'asset', 'side', 'quantity', 'price', 'total', 'fees', 'hash'];
-    const rows = filteredTransactions.map(tx => [
-      tx.timestamp, tx.chain, tx.asset, tx.side,
-      tx.quantity.toString(), tx.price.toString(), tx.total.toString(),
-      tx.fees.toString(), tx.hash
-    ]);
+    if (transactionType === 'perp') {
+      const perps = filteredTransactions as PerpTransaction[];
+      const headers = ['timestamp', 'asset', 'side', 'quantity', 'entry_price', 'exit_price', 'pnl', 'fees', 'funding', 'exchange', 'leverage', 'liquidation', 'chain', 'hash'];
+      const rows = perps.map(tx => [
+        tx.timestamp,
+        tx.asset,
+        tx.side,
+        tx.quantity.toString(),
+        tx.entry_price.toString(),
+        tx.exit_price?.toString() || '',
+        tx.pnl?.toString() || '',
+        tx.fees.toString(),
+        tx.funding.toString(),
+        tx.exchange,
+        tx.leverage.toString(),
+        tx.liquidation ? 'YES' : 'NO',
+        tx.chain,
+        tx.hash
+      ]);
 
-    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `tax-export-${wallet.slice(0, 8)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [filteredTransactions, wallet]);
+      const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `perp-tax-export-${wallet.slice(0, 8)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } else {
+      const spots = filteredTransactions as SpotTransaction[];
+      const headers = ['timestamp', 'chain', 'asset', 'side', 'quantity', 'price', 'total', 'fees', 'hash'];
+      const rows = spots.map(tx => [
+        tx.timestamp, tx.chain, tx.asset, tx.side,
+        tx.quantity.toString(), tx.price.toString(), tx.total.toString(),
+        tx.fees.toString(), tx.hash
+      ]);
+
+      const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `tax-export-${wallet.slice(0, 8)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  }, [filteredTransactions, transactionType, wallet]);
 
   const uniqueAssets = [...new Set(transactions.map(tx => tx.asset))].sort();
 
@@ -440,15 +519,41 @@ export default function HomePage() {
               transition={{ duration: 0.6 }}
             >
               <DecryptedText
-                text="CRYPTO TAX EXPORTER"
+                text={transactionType === 'perp' ? 'PERP TAX EXPORTER' : 'CRYPTO TAX EXPORTER'}
                 speed={40}
                 revealSpeed={30}
               />
             </motion.h1>
             <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-              Multi-chain transactions with hyperspeed precision. Export to tax-compatible formats.
+              {transactionType === 'perp' 
+                ? 'Export perpetuals & futures positions to tax-compliant formats. Supports Hyperliquid, GMX, Synthetix Perps.'
+                : 'Multi-chain spot transactions with hyperspeed precision. Export to tax-compatible formats.'}
             </p>
           </motion.div>
+        </AnimatedContent>
+
+        {/* Type Toggle */}
+        <AnimatedContent delay={0.1}>
+          <div className="flex justify-center mb-6">
+            <div className="inline-flex items-center gap-2 p-1 bg-slate-800/50 rounded-xl border border-slate-700/50">
+              <Button
+                variant={transactionType === 'spot' ? 'default' : 'ghost'}
+                onClick={() => setTransactionType('spot')}
+                className={transactionType === 'spot' ? 'bg-purple-600' : 'text-gray-400 hover:text-white'}
+              >
+                <Activity className="mr-2 h-4 w-4" />
+                Spot
+              </Button>
+              <Button
+                variant={transactionType === 'perp' ? 'default' : 'ghost'}
+                onClick={() => setTransactionType('perp')}
+                className={transactionType === 'perp' ? 'bg-yellow-600' : 'text-gray-400 hover:text-white'}
+              >
+                <TrendingUp className="mr-2 h-4 w-4" />
+                Perps/Futures
+              </Button>
+            </div>
+          </div>
         </AnimatedContent>
 
         {/* Search Card */}
@@ -465,34 +570,54 @@ export default function HomePage() {
                 >
                   <Wallet className="h-6 w-6 text-purple-400" />
                 </motion.div>
-                Wallet Search
+                {transactionType === 'perp' ? 'Perp Exchange Search' : 'Wallet Search'}
               </CardTitle>
               <CardDescription className="text-gray-400">
-                Enter any supported chain wallet address. Uses free public RPC endpoints.
+                {transactionType === 'perp' 
+                  ? 'Enter wallet address for perp positions. Mock data for demo.'
+                  : 'Enter any supported chain wallet address. Uses free public RPC endpoints.'}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="flex flex-col md:flex-row gap-4">
-                <Select value={chain} onValueChange={setChain}>
-                  <SelectTrigger className="w-full md:w-[180px] bg-slate-800/50 border-slate-600 text-white">
-                    <SelectValue placeholder="Chain" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-slate-800 border-slate-600">
-                    {SUPPORTED_CHAINS.map(c => (
-                      <SelectItem key={c.id} value={c.id} className="text-white hover:bg-slate-700">
-                        <span className="flex items-center gap-2">
-                          <span className={cn("w-3 h-3 rounded-full bg-gradient-to-r", c.color)} />
-                          {c.name}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {transactionType === 'perp' ? (
+                  <Select value={chain} onValueChange={setChain}>
+                    <SelectTrigger className="w-full md:w-[200px] bg-slate-800/50 border-slate-600 text-white">
+                      <SelectValue placeholder="Exchange" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-800 border-slate-600">
+                      {PERP_EXCHANGES.map(ex => (
+                        <SelectItem key={ex.id} value={ex.id} className="text-white hover:bg-slate-700">
+                          <span className="flex items-center gap-2">
+                            <span className={cn("w-3 h-3 rounded-full bg-gradient-to-r", ex.color)} />
+                            {ex.name}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Select value={chain} onValueChange={setChain}>
+                    <SelectTrigger className="w-full md:w-[180px] bg-slate-800/50 border-slate-600 text-white">
+                      <SelectValue placeholder="Chain" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-800 border-slate-600">
+                      {SUPPORTED_CHAINS.filter(c => c.type === 'both' || c.type === 'spot').map(c => (
+                        <SelectItem key={c.id} value={c.id} className="text-white hover:bg-slate-700">
+                          <span className="flex items-center gap-2">
+                            <span className={cn("w-3 h-3 rounded-full bg-gradient-to-r", c.color)} />
+                            {c.name}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
 
                 <div className="relative flex-1">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                   <Input
-                    placeholder={`Enter ${SUPPORTED_CHAINS.find(c => c.id === chain)?.name} address...`}
+                    placeholder={`Enter ${transactionType === 'perp' ? PERP_EXCHANGES.find(e => e.id === chain)?.name : SUPPORTED_CHAINS.find(c => c.id === chain)?.name} address...`}
                     value={wallet}
                     onChange={e => setWallet(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && fetchTransactions()}
@@ -502,12 +627,17 @@ export default function HomePage() {
                   />
                 </div>
 
-                <ClickSpark sparkColor="#8b5cf6" sparkCount={8}>
+                <ClickSpark>
                   <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                     <Button 
                       onClick={fetchTransactions} 
                       disabled={loading}
-                      className="h-12 px-8 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold"
+                      className={cn(
+                        "h-12 px-8 text-white font-semibold",
+                        transactionType === 'perp' 
+                          ? 'bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500'
+                          : 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500'
+                      )}
                     >
                       {loading ? (
                         <motion.span
@@ -543,39 +673,65 @@ export default function HomePage() {
               exit={{ opacity: 0 }}
               className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8"
             >
-              {[
-                { label: 'Trades', value: summary.tradeCount, color: 'from-blue-500 to-cyan-500', icon: Activity, delay: 0, isCount: false },
-                { label: 'Buys', value: summary.totalBuys, prefix: '$', color: 'from-green-500 to-emerald-500', icon: TrendingUp, delay: 0.1, isCurrency: true },
-                { label: 'Sells', value: summary.totalSells, prefix: '$', color: 'from-red-500 to-orange-500', icon: TrendingDown, delay: 0.2, isCurrency: true },
-                { label: 'Fees', value: summary.totalFees, prefix: '$', color: 'from-gray-500 to-gray-700', icon: DollarSign, delay: 0.3, isCurrency: true },
-                { label: 'Assets', value: summary.uniqueAssets, color: 'from-purple-500 to-pink-500', icon: Calendar, delay: 0.4, isCount: false },
-              ].map((stat, i) => (
-                <AnimatedContent key={stat.label} delay={stat.delay}>
-                  <SpotlightCard
-                    className="bg-slate-900/80 backdrop-blur-xl border-slate-700/50"
-                    spotlightColor={stat.color.replace('from-', 'rgba(').replace(' to-', ', ').split(',')[0] + ', 0.5)'}
-                  >
-                    <CardContent className="pt-6">
-                      <div className={cn("flex items-center gap-2 text-sm bg-gradient-to-r bg-clip-text text-transparent", stat.color)}>
-                        <stat.icon className="h-4 w-4" />
-                        <span>{stat.label}</span>
-                      </div>
-                      <p className="text-3xl font-bold mt-2 tabular-nums text-white">
-                        {stat.isCurrency ? (
-                          <CountUp 
-                            end={stat.value} 
-                            prefix={stat.prefix || ''} 
-                            decimals={2}
-                            duration={1.5}
-                          />
-                        ) : (
-                          <CountUp end={stat.value} duration={1} />
-                        )}
-                      </p>
-                    </CardContent>
-                  </SpotlightCard>
-                </AnimatedContent>
-              ))}
+              {transactionType === 'perp' ? (
+                [
+                  { label: 'Total PnL', value: summary.totalPnl, prefix: '$', color: 'from-green-500 to-emerald-500', icon: TrendingUp, delay: 0 },
+                  { label: 'Fees', value: summary.totalFees, prefix: '$', color: 'from-gray-500 to-gray-700', icon: DollarSign, delay: 0.1 },
+                  { label: 'Funding', value: summary.totalFunding, prefix: '$', color: 'from-blue-500 to-cyan-500', icon: Activity, delay: 0.2 },
+                  { label: 'Open Positions', value: summary.openPositions, color: 'from-purple-500 to-pink-500', icon: Wallet, delay: 0.3, isCount: true },
+                  { label: 'Assets', value: summary.uniqueAssets, color: 'from-orange-500 to-red-500', icon: Calendar, delay: 0.4, isCount: true },
+                ].map((stat) => (
+                  <AnimatedContent key={stat.label} delay={stat.delay}>
+                    <SpotlightCard
+                      className="bg-slate-900/80 backdrop-blur-xl border-slate-700/50"
+                      spotlightColor={stat.color.replace('from-', 'rgba(').replace(' to-', ', ').split(',')[0] + ', 0.5)'}
+                    >
+                      <CardContent className="pt-6">
+                        <div className={cn("flex items-center gap-2 text-sm bg-gradient-to-r bg-clip-text text-transparent", stat.color)}>
+                          <stat.icon className="h-4 w-4" />
+                          <span>{stat.label}</span>
+                        </div>
+                        <p className="text-3xl font-bold mt-2 tabular-nums text-white">
+                          {stat.prefix ? (
+                            <CountUp end={stat.value as number} prefix={stat.prefix} decimals={2} duration={1.5} />
+                          ) : (
+                            <CountUp end={stat.value as number} duration={1} />
+                          )}
+                        </p>
+                      </CardContent>
+                    </SpotlightCard>
+                  </AnimatedContent>
+                ))
+              ) : (
+                [
+                  { label: 'Trades', value: summary.tradeCount, color: 'from-blue-500 to-cyan-500', icon: Activity, delay: 0, isCount: true },
+                  { label: 'Buys', value: summary.totalBuys, prefix: '$', color: 'from-green-500 to-emerald-500', icon: TrendingUp, delay: 0.1, isCurrency: true },
+                  { label: 'Sells', value: summary.totalSells, prefix: '$', color: 'from-red-500 to-orange-500', icon: TrendingDown, delay: 0.2, isCurrency: true },
+                  { label: 'Fees', value: summary.totalFees, prefix: '$', color: 'from-gray-500 to-gray-700', icon: DollarSign, delay: 0.3, isCurrency: true },
+                  { label: 'Assets', value: summary.uniqueAssets, color: 'from-purple-500 to-pink-500', icon: Calendar, delay: 0.4, isCount: true },
+                ].map((stat) => (
+                  <AnimatedContent key={stat.label} delay={stat.delay}>
+                    <SpotlightCard
+                      className="bg-slate-900/80 backdrop-blur-xl border-slate-700/50"
+                      spotlightColor={stat.color.replace('from-', 'rgba(').replace(' to-', ', ').split(',')[0] + ', 0.5)'}
+                    >
+                      <CardContent className="pt-6">
+                        <div className={cn("flex items-center gap-2 text-sm bg-gradient-to-r bg-clip-text text-transparent", stat.color)}>
+                          <stat.icon className="h-4 w-4" />
+                          <span>{stat.label}</span>
+                        </div>
+                        <p className="text-3xl font-bold mt-2 tabular-nums text-white">
+                          {stat.isCurrency ? (
+                            <CountUp end={stat.value as number} prefix={stat.prefix || ''} decimals={2} duration={1.5} />
+                          ) : (
+                            <CountUp end={stat.value as number} duration={1} />
+                          )}
+                        </p>
+                      </CardContent>
+                    </SpotlightCard>
+                  </AnimatedContent>
+                ))
+              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -647,11 +803,122 @@ export default function HomePage() {
 
         {/* Transactions Table */}
         <AnimatePresence>
-          {filteredTransactions.length > 0 && (
+          {filteredTransactions.length > 0 && transactionType === 'perp' ? (
             <AnimatedContent delay={0.6}>
               <Card className="bg-slate-900/80 backdrop-blur-xl border-slate-700/50">
                 <CardHeader>
-                  <CardTitle className="text-white text-xl">Transactions</CardTitle>
+                  <CardTitle className="text-white text-xl flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5 text-yellow-500" />
+                    Perpetuals & Futures Positions
+                  </CardTitle>
+                  <CardDescription className="text-gray-400">
+                    {filteredTransactions.length} positions • Awaken Tax compatible format
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-lg border border-slate-700/50 overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-slate-800/50 border-slate-700/50">
+                          <TableHead className="text-gray-300">Date</TableHead>
+                          <TableHead className="text-gray-300">Exchange</TableHead>
+                          <TableHead className="text-gray-300">Asset</TableHead>
+                          <TableHead className="text-gray-300">Side</TableHead>
+                          <TableHead className="text-right text-gray-300">Size</TableHead>
+                          <TableHead className="text-right text-gray-300">Entry</TableHead>
+                          <TableHead className="text-right text-gray-300">Exit</TableHead>
+                          <TableHead className="text-right text-gray-300">PnL</TableHead>
+                          <TableHead className="text-right text-gray-300">Fees</TableHead>
+                          <TableHead className="text-right text-gray-300">Funding</TableHead>
+                          <TableHead className="text-center text-gray-300">Lev</TableHead>
+                          <TableHead className="text-center text-gray-300">Liq</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredTransactions.map((tx, i) => {
+                          const perp = tx as PerpTransaction;
+                          return (
+                            <motion.tr
+                              key={`${perp.hash}-${i}`}
+                              initial={{ opacity: 0, x: -20 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ duration: 0.3, delay: i * 0.03 }}
+                              className="border-slate-700/30 hover:bg-slate-800/30 transition-colors"
+                            >
+                              <TableCell className="text-gray-300 whitespace-nowrap">
+                                {new Date(perp.timestamp).toLocaleDateString()}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="secondary" className="text-xs font-medium bg-gradient-to-r from-yellow-500/20 to-orange-500/20 text-yellow-400 border-yellow-500/30">
+                                  {perp.exchange}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="font-mono font-medium text-white">
+                                {perp.asset}
+                              </TableCell>
+                              <TableCell>
+                                <Badge 
+                                  className={cn(
+                                    "gap-1",
+                                    perp.side === 'LONG' ? "bg-green-500/20 text-green-400 border-green-500/50" : "bg-red-500/20 text-red-400 border-red-500/50"
+                                  )}
+                                >
+                                  {perp.side}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-gray-300 tabular-nums">
+                                {perp.quantity.toFixed(4)}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-gray-300 tabular-nums">
+                                ${perp.entry_price.toFixed(2)}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-gray-300 tabular-nums">
+                                {perp.exit_price ? `$${perp.exit_price.toFixed(2)}` : '-'}
+                              </TableCell>
+                              <TableCell className={cn(
+                                "text-right font-mono font-medium tabular-nums",
+                                perp.pnl === undefined ? "text-gray-500" : 
+                                perp.pnl >= 0 ? "text-green-400" : "text-red-400"
+                              )}>
+                                {perp.pnl !== undefined ? `$${perp.pnl.toFixed(2)}` : 'Open'}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-gray-400 tabular-nums">
+                                ${perp.fees.toFixed(2)}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-gray-400 tabular-nums">
+                                ${perp.funding.toFixed(2)}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                {perp.leverage > 0 && (
+                                  <Badge variant="outline" className="border-slate-600 text-gray-400">
+                                    {perp.leverage}x
+                                  </Badge>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                {perp.liquidation && (
+                                  <Badge className="bg-red-500/20 text-red-400 border-red-500/50">
+                                    YES
+                                  </Badge>
+                                )}
+                              </TableCell>
+                            </motion.tr>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            </AnimatedContent>
+          ) : filteredTransactions.length > 0 ? (
+            <AnimatedContent delay={0.6}>
+              <Card className="bg-slate-900/80 backdrop-blur-xl border-slate-700/50">
+                <CardHeader>
+                  <CardTitle className="text-white text-xl flex items-center gap-2">
+                    <Activity className="h-5 w-5 text-purple-500" />
+                    Transactions
+                  </CardTitle>
                   <CardDescription className="text-gray-400">
                     {filteredTransactions.length} of {transactions.length} transactions
                   </CardDescription>
@@ -673,68 +940,70 @@ export default function HomePage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredTransactions.map((tx, i) => (
-                          <motion.tr
-                            key={`${tx.hash}-${i}`}
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ duration: 0.3, delay: i * 0.03 }}
-                            className="border-slate-700/30 hover:bg-slate-800/30 transition-colors"
-                          >
-                            <TableCell className="text-gray-300 whitespace-nowrap">
-                              {new Date(tx.timestamp).toLocaleDateString()}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="secondary" className={cn(
-                                "text-xs font-medium bg-gradient-to-r",
-                                tx.chain === 'solana' && "from-purple-500 to-purple-700 text-white",
-                                tx.chain === 'ethereum' && "from-blue-500 to-blue-700 text-white",
-                                tx.chain === 'base' && "from-indigo-500 to-indigo-700 text-white",
-                                tx.chain === 'bittensor' && "from-orange-500 to-orange-700 text-white",
-                                tx.chain === 'polkadot' && "from-pink-500 to-pink-700 text-white",
-                              )}>
-                                {tx.chain}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="font-mono font-medium text-white">
-                              {tx.asset}
-                            </TableCell>
-                            <TableCell>
-                              <Badge 
-                                className={cn(
-                                  "gap-1",
-                                  tx.side === 'BUY' && "bg-green-500/20 text-green-400 border-green-500/50",
-                                  tx.side === 'SELL' && "bg-red-500/20 text-red-400 border-red-500/50"
-                                )}
-                              >
-                                {tx.side === 'BUY' ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-                                {tx.side}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-gray-300 tabular-nums">
-                              {tx.quantity.toFixed(4)}
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-gray-300 tabular-nums">
-                              ${tx.price.toFixed(2)}
-                            </TableCell>
-                            <TableCell className="text-right font-mono font-medium text-white tabular-nums">
-                              ${tx.total.toFixed(2)}
-                            </TableCell>
-                            <TableCell className="text-right font-mono text-gray-400 tabular-nums">
-                              ${tx.fees.toFixed(2)}
-                            </TableCell>
-                            <TableCell className="hidden lg:table-cell font-mono text-sm text-gray-500 max-w-[100px] truncate" title={tx.hash}>
-                              {tx.hash}
-                            </TableCell>
-                          </motion.tr>
-                        ))}
+                        {filteredTransactions.map((tx, i) => {
+                          const spot = tx as SpotTransaction;
+                          return (
+                            <motion.tr
+                              key={`${spot.hash}-${i}`}
+                              initial={{ opacity: 0, x: -20 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ duration: 0.3, delay: i * 0.03 }}
+                              className="border-slate-700/30 hover:bg-slate-800/30 transition-colors"
+                            >
+                              <TableCell className="text-gray-300 whitespace-nowrap">
+                                {new Date(spot.timestamp).toLocaleDateString()}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="secondary" className={cn(
+                                  "text-xs font-medium bg-gradient-to-r",
+                                  spot.chain === 'solana' && "from-purple-500 to-purple-700 text-white",
+                                  spot.chain === 'ethereum' && "from-blue-500 to-blue-700 text-white",
+                                  spot.chain === 'base' && "from-indigo-500 to-indigo-700 text-white",
+                                  spot.chain === 'bittensor' && "from-orange-500 to-orange-700 text-white",
+                                  spot.chain === 'polkadot' && "from-pink-500 to-pink-700 text-white",
+                                )}>
+                                  {spot.chain}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="font-mono font-medium text-white">
+                                {spot.asset}
+                              </TableCell>
+                              <TableCell>
+                                <Badge 
+                                  className={cn(
+                                    "gap-1",
+                                    spot.side === 'BUY' ? "bg-green-500/20 text-green-400 border-green-500/50" : "bg-red-500/20 text-red-400 border-red-500/50"
+                                  )}
+                                >
+                                  {spot.side === 'BUY' ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                                  {spot.side}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-gray-300 tabular-nums">
+                                {spot.quantity.toFixed(4)}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-gray-300 tabular-nums">
+                                ${spot.price.toFixed(2)}
+                              </TableCell>
+                              <TableCell className="text-right font-mono font-medium text-white tabular-nums">
+                                ${spot.total.toFixed(2)}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-gray-400 tabular-nums">
+                                ${spot.fees.toFixed(2)}
+                              </TableCell>
+                              <TableCell className="hidden lg:table-cell font-mono text-sm text-gray-500 max-w-[100px] truncate" title={spot.hash}>
+                                {spot.hash}
+                              </TableCell>
+                            </motion.tr>
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   </div>
                 </CardContent>
               </Card>
             </AnimatedContent>
-          )}
+          ) : null}
         </AnimatePresence>
 
         {/* Loading State with LetterGlitch */}
@@ -742,10 +1011,10 @@ export default function HomePage() {
           <Card className="mb-8 bg-slate-900/80 backdrop-blur-xl border-slate-700/50">
             <CardHeader>
               <LetterGlitch
-                text="FETCHING BLOCKCHAIN DATA..."
+                text={transactionType === 'perp' ? 'FETCHING PERPETUAL POSITIONS...' : 'FETCHING BLOCKCHAIN DATA...'}
                 glitchSpeed={50}
                 center
-                className="text-purple-400"
+                className={transactionType === 'perp' ? 'text-yellow-400' : 'text-purple-400'}
               />
               <Skeleton className="h-6 w-48 bg-slate-700" />
             </CardHeader>
