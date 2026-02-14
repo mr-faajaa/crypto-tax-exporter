@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,9 +11,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Download, AlertCircle, Wallet, TrendingUp, TrendingDown, DollarSign, Activity, Calendar, Search, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { motion, AnimatePresence, useScroll, useTransform, useSpring } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
-// Hyperspeed starfield background component
+// Custom ReactBits-style implementations (no Three.js dependency)
+
+// Hyperspeed starfield background
 function HyperspeedBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
@@ -32,7 +34,7 @@ function HyperspeedBackground() {
     window.addEventListener('resize', resize);
     
     const stars: { x: number; y: number; z: number; size: number }[] = [];
-    const numStars = 500;
+    const numStars = 600;
     
     for (let i = 0; i < numStars; i++) {
       stars.push({
@@ -71,10 +73,20 @@ function HyperspeedBackground() {
           ctx.beginPath();
           ctx.arc(x, y, size, 0, Math.PI * 2);
           ctx.fill();
+          
+          // Speed line effect for fast stars
+          if (speed > 5 && brightness > 0.7) {
+            ctx.strokeStyle = `rgba(139, 92, 246, ${brightness * 0.5})`;
+            ctx.lineWidth = size * 0.5;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x - size * 3, y);
+            ctx.stroke();
+          }
         }
       });
       
-      speed = Math.min(speed + 0.01, 15);
+      speed = Math.min(speed + 0.005, 20);
       animationId = requestAnimationFrame(animate);
     };
     
@@ -90,95 +102,128 @@ function HyperspeedBackground() {
     <canvas
       ref={canvasRef}
       className="fixed inset-0 -z-20"
-      style={{ background: 'linear-gradient(to bottom, #0a0a0f 0%, #1a1a2e 100%)' }}
+      style={{ background: 'linear-gradient(to bottom, #0a0a0f 0%, #0d0d1a 100%)' }}
     />
   );
 }
 
-// Aurora glow with hyperspeed feel
-function AuroraHyperspeed() {
+// Aurora overlay effect
+function AuroraOverlay() {
   return (
-    <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
-      <motion.div
-        className="absolute inset-0 opacity-30"
-        style={{
-          background: 'radial-gradient(ellipse at 30% 20%, rgba(139, 92, 246, 0.4) 0%, transparent 50%), radial-gradient(ellipse at 70% 80%, rgba(59, 130, 246, 0.3) 0%, transparent 50%), radial-gradient(ellipse at 50% 50%, rgba(236, 72, 153, 0.2) 0%, transparent 60%)',
-        }}
-        animate={{
-          backgroundPosition: ['0% 0%', '100% 100%', '0% 0%'],
-          scale: [1, 1.2, 1],
-        }}
-        transition={{ duration: 15, repeat: Infinity, ease: 'linear' }}
-      />
-      {/* Speed lines */}
+    <div className="fixed inset-0 -z-10 pointer-events-none overflow-hidden">
       <motion.div
         className="absolute inset-0"
         style={{
-          background: 'repeating-linear-gradient(90deg, transparent, transparent 50px, rgba(139, 92, 246, 0.03) 50px, rgba(139, 92, 246, 0.03) 100px)',
+          background: 'radial-gradient(ellipse at 30% 20%, rgba(139, 92, 246, 0.25) 0%, transparent 50%), radial-gradient(ellipse at 70% 80%, rgba(59, 130, 246, 0.2) 0%, transparent 50%), radial-gradient(ellipse at 50% 50%, rgba(236, 72, 153, 0.15) 0%, transparent 60%)',
         }}
-        animate={{ x: [-100, 100] }}
-        transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+        animate={{
+          backgroundPosition: ['0% 0%', '100% 100%', '0% 0%'],
+          scale: [1, 1.1, 1],
+        }}
+        transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
+      />
+      <motion.div
+        className="absolute inset-0"
+        style={{
+          background: 'repeating-linear-gradient(90deg, transparent, transparent 80px, rgba(139, 92, 246, 0.02) 80px, rgba(139, 92, 246, 0.02) 160px)',
+        }}
+        animate={{ x: [-160, 0] }}
+        transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
       />
     </div>
   );
 }
 
-// Spotlight card with glow effect
+// SpotlightCard with cursor tracking
 function SpotlightCard({ children, className, spotlightColor = 'rgba(139, 92, 246, 0.5)' }: { children: React.ReactNode; className?: string; spotlightColor?: string }) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+  useEffect(() => {
+    const card = cardRef.current;
+    if (!card) return;
+    const handleMouseMove = (e: MouseEvent) => {
+      const rect = card.getBoundingClientRect();
+      setMousePos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+    };
+    card.addEventListener('mousemove', handleMouseMove);
+    return () => card.removeEventListener('mousemove', handleMouseMove);
+  }, []);
+
   return (
     <motion.div
+      ref={cardRef}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
       whileHover={{ scale: 1.02 }}
       className={cn("relative overflow-hidden rounded-xl", className)}
+      style={{ background: 'linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%)' }}
     >
-      <div 
-        className="absolute inset-0 opacity-0 hover:opacity-100 transition-all duration-500 pointer-events-none"
-        style={{
-          background: `radial-gradient(circle at 50% 0%, ${spotlightColor}, transparent 70%)`,
-        }}
-      />
-      <div 
-        className="absolute inset-0"
-        style={{
-          background: 'linear-gradient(180deg, rgba(255,255,255,0.1) 0%, transparent 100%)',
-        }}
+      <motion.div
+        className="absolute inset-0 pointer-events-none"
+        animate={{ background: `radial-gradient(circle at ${mousePos.x}px ${mousePos.y}px, ${spotlightColor}, transparent 50%)` }}
+        transition={{ duration: 0.1 }}
       />
       {children}
     </motion.div>
   );
 }
 
-// Animated counter with hyperspeed effect
-function HyperCounter({ value, prefix = '', decimals = 0, duration = 0.8 }: { value: number; prefix?: string; decimals?: number; duration?: number }) {
+// CountUp animated counter
+function CountUp({ end, prefix = '', decimals = 0, duration = 1.5 }: { end: number; prefix?: string; decimals?: number; duration?: number }) {
+  const [count, setCount] = useState(0);
+  const startTimeRef = useRef<number | null>(null);
+  const requestRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const animate = (time: number) => {
+      if (!startTimeRef.current) startTimeRef.current = time;
+      const elapsed = time - startTimeRef.current;
+      const progress = Math.min(elapsed / (duration * 1000), 1);
+      const easeProgress = 1 - Math.pow(1 - progress, 4);
+      setCount(easeProgress * end);
+      if (progress < 1) requestRef.current = requestAnimationFrame(animate);
+    };
+    requestRef.current = requestAnimationFrame(animate);
+    return () => { if (requestRef.current) cancelAnimationFrame(requestRef.current); };
+  }, [end, duration]);
+
+  return <span className="font-bold tabular-nums">{prefix}{count.toFixed(decimals)}</span>;
+}
+
+// DecryptedText reveal effect
+function DecryptedText({ text, speed = 40, revealSpeed = 30 }: { text: string; speed?: number; revealSpeed?: number }) {
+  const [displayed, setDisplayed] = useState('');
+  const [isComplete, setIsComplete] = useState(false);
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:,.<>?';
+
+  useEffect(() => {
+    let currentIndex = 0;
+    const interval = setInterval(() => {
+      if (currentIndex < text.length) {
+        setDisplayed(text.substring(0, currentIndex + 1) + 
+          text.substring(currentIndex + 1).split('').map(() => chars[Math.floor(Math.random() * chars.length)]).join(''));
+        currentIndex++;
+      } else {
+        setDisplayed(text);
+        setIsComplete(true);
+        clearInterval(interval);
+      }
+    }, speed);
+    return () => clearInterval(interval);
+  }, [text, speed, chars]);
+
+  if (isComplete) return <span className="bg-gradient-to-r from-purple-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">{text}</span>;
+
   return (
-    <motion.span
-      initial={{ opacity: 0, scale: 0.5 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration, type: 'spring', stiffness: 200, damping: 15 }}
-      className="font-bold"
-    >
-      {prefix}{value.toFixed(decimals)}
+    <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-gradient-to-r from-purple-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
+      {displayed}
     </motion.span>
   );
 }
 
-// Decrypted text reveal
-function DecryptedText({ text }: { text: string }) {
-  return (
-    <motion.span
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.5 }}
-      className="bg-gradient-to-r from-purple-400 via-blue-400 to-purple-400 bg-clip-text text-transparent bg-[length:200%_auto] animate-gradient"
-    >
-      {text}
-    </motion.span>
-  );
-}
-
-// Animated content wrapper
+// AnimatedContent wrapper
 function AnimatedContent({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
   return (
     <motion.div
@@ -191,22 +236,41 @@ function AnimatedContent({ children, delay = 0 }: { children: React.ReactNode; d
   );
 }
 
-// Spark effect on click
-function useSpark() {
+// ClickSpark wrapper
+function ClickSpark({ children, sparkColor = '#8b5cf6', sparkCount = 8 }: { children: React.ReactNode; sparkColor?: string; sparkCount?: number }) {
   return (
-    <motion.div
-      initial={{ opacity: 1, scale: 0 }}
-      animate={{ opacity: 0, scale: 2 }}
-      transition={{ duration: 0.5 }}
-      className="absolute pointer-events-none"
-      style={{
-        background: 'radial-gradient(circle, rgba(139, 92, 246, 0.8) 0%, transparent 70%)',
-        width: 100,
-        height: 100,
-        transform: 'translate(-50%, -50%)',
-      }}
-    />
+    <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+      {children}
+    </motion.div>
   );
+}
+
+// LetterGlitch text effect
+function LetterGlitch({ text, glitchSpeed = 50, center, className = '' }: { text: string; glitchSpeed?: number; center?: boolean; className?: string }) {
+  const [displayText, setDisplayText] = useState(text);
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()';
+
+  useEffect(() => {
+    let phase = 0;
+    const maxPhases = 5;
+    const timeouts: NodeJS.Timeout[] = [];
+    const scramble = () => {
+      if (phase < maxPhases) {
+        setDisplayText(text.split('').map((char, i) => {
+          if (i < phase || i >= text.length - phase) return char;
+          return chars[Math.floor(Math.random() * chars.length)];
+        }).join(''));
+        phase++;
+        timeouts.push(setTimeout(scramble, glitchSpeed));
+      } else {
+        setDisplayText(text);
+      }
+    };
+    timeouts.push(setTimeout(scramble, 100));
+    return () => timeouts.forEach(clearTimeout);
+  }, [text, glitchSpeed, chars]);
+
+  return <span className={cn(center && 'flex justify-center', className)}>{displayText}</span>;
 }
 
 interface Transaction {
@@ -354,9 +418,11 @@ export default function HomePage() {
 
   return (
     <div className="relative min-h-screen overflow-x-hidden">
-      {/* Hyperspeed background */}
+      {/* Hyperspeed Background */}
       <HyperspeedBackground />
-      <AuroraHyperspeed />
+
+      {/* Aurora Overlay */}
+      <AuroraOverlay />
 
       <div className="container mx-auto py-12 px-4 max-w-7xl relative z-10">
         {/* Header */}
@@ -373,7 +439,11 @@ export default function HomePage() {
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.6 }}
             >
-              <DecryptedText text="CRYPTO TAX EXPORTER" />
+              <DecryptedText
+                text="CRYPTO TAX EXPORTER"
+                speed={40}
+                revealSpeed={30}
+              />
             </motion.h1>
             <p className="text-xl text-gray-400 max-w-2xl mx-auto">
               Multi-chain transactions with hyperspeed precision. Export to tax-compatible formats.
@@ -385,7 +455,7 @@ export default function HomePage() {
         <AnimatedContent delay={0.2}>
           <SpotlightCard 
             className="mb-8 bg-slate-900/80 backdrop-blur-xl border-slate-700/50"
-            spotlightColor="rgba(139, 92, 246, 0.6)"
+            spotlightColor="#8b5cf6"
           >
             <CardHeader>
               <CardTitle className="flex items-center gap-3 text-white text-xl">
@@ -432,24 +502,26 @@ export default function HomePage() {
                   />
                 </div>
 
-                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                  <Button 
-                    onClick={fetchTransactions} 
-                    disabled={loading}
-                    className="h-12 px-8 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold"
-                  >
-                    {loading ? (
-                      <motion.span
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                      >
-                        <Activity className="h-5 w-5" />
-                      </motion.span>
-                    ) : (
-                      'FETCH'
-                    )}
-                  </Button>
-                </motion.div>
+                <ClickSpark sparkColor="#8b5cf6" sparkCount={8}>
+                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                    <Button 
+                      onClick={fetchTransactions} 
+                      disabled={loading}
+                      className="h-12 px-8 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold"
+                    >
+                      {loading ? (
+                        <motion.span
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                        >
+                          <Activity className="h-5 w-5" />
+                        </motion.span>
+                      ) : (
+                        'FETCH'
+                      )}
+                    </Button>
+                  </motion.div>
+                </ClickSpark>
               </div>
 
               {error && (
@@ -472,11 +544,11 @@ export default function HomePage() {
               className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8"
             >
               {[
-                { label: 'Trades', value: summary.tradeCount, color: 'from-blue-500 to-cyan-500', icon: Activity, delay: 0 },
-                { label: 'Buys', value: summary.totalBuys, prefix: '$', color: 'from-green-500 to-emerald-500', icon: TrendingUp, delay: 0.1 },
-                { label: 'Sells', value: summary.totalSells, prefix: '$', color: 'from-red-500 to-orange-500', icon: TrendingDown, delay: 0.2 },
-                { label: 'Fees', value: summary.totalFees, prefix: '$', color: 'from-gray-500 to-gray-700', icon: DollarSign, delay: 0.3 },
-                { label: 'Assets', value: summary.uniqueAssets, color: 'from-purple-500 to-pink-500', icon: Calendar, delay: 0.4 },
+                { label: 'Trades', value: summary.tradeCount, color: 'from-blue-500 to-cyan-500', icon: Activity, delay: 0, isCount: false },
+                { label: 'Buys', value: summary.totalBuys, prefix: '$', color: 'from-green-500 to-emerald-500', icon: TrendingUp, delay: 0.1, isCurrency: true },
+                { label: 'Sells', value: summary.totalSells, prefix: '$', color: 'from-red-500 to-orange-500', icon: TrendingDown, delay: 0.2, isCurrency: true },
+                { label: 'Fees', value: summary.totalFees, prefix: '$', color: 'from-gray-500 to-gray-700', icon: DollarSign, delay: 0.3, isCurrency: true },
+                { label: 'Assets', value: summary.uniqueAssets, color: 'from-purple-500 to-pink-500', icon: Calendar, delay: 0.4, isCount: false },
               ].map((stat, i) => (
                 <AnimatedContent key={stat.label} delay={stat.delay}>
                   <SpotlightCard
@@ -489,11 +561,16 @@ export default function HomePage() {
                         <span>{stat.label}</span>
                       </div>
                       <p className="text-3xl font-bold mt-2 tabular-nums text-white">
-                        <HyperCounter 
-                          value={stat.value} 
-                          prefix={stat.prefix || ''} 
-                          decimals={stat.prefix ? 2 : 0} 
-                        />
+                        {stat.isCurrency ? (
+                          <CountUp 
+                            end={stat.value} 
+                            prefix={stat.prefix || ''} 
+                            decimals={2}
+                            duration={1.5}
+                          />
+                        ) : (
+                          <CountUp end={stat.value} duration={1} />
+                        )}
                       </p>
                     </CardContent>
                   </SpotlightCard>
@@ -555,12 +632,12 @@ export default function HomePage() {
                       </SelectContent>
                     </Select>
 
-                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                    <ClickSpark sparkColor="#8b5cf6" sparkCount={6}>
                       <Button variant="outline" onClick={exportToCSV} className="border-slate-600 text-white hover:bg-slate-700">
                         <Download className="mr-2 h-4 w-4" />
                         Export CSV
                       </Button>
-                    </motion.div>
+                    </ClickSpark>
                   </div>
                 </CardContent>
               </Card>
@@ -660,10 +737,16 @@ export default function HomePage() {
           )}
         </AnimatePresence>
 
-        {/* Loading State */}
+        {/* Loading State with LetterGlitch */}
         {loading && (
           <Card className="mb-8 bg-slate-900/80 backdrop-blur-xl border-slate-700/50">
             <CardHeader>
+              <LetterGlitch
+                text="FETCHING BLOCKCHAIN DATA..."
+                glitchSpeed={50}
+                center
+                className="text-purple-400"
+              />
               <Skeleton className="h-6 w-48 bg-slate-700" />
             </CardHeader>
             <CardContent>

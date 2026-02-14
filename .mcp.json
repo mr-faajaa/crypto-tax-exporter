@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "reactbits": {
+      "command": "npx",
+      "args": ["-y", "@appletosolutions/reactbits"]
+    },
+    "shadcn": {
+      "command": "npx",
+      "args": ["shadcn@latest", "mcp"]
+    },
+    "agent-browser": {
+      "command": "npx",
+      "args": ["-y", "agent-browser"]
+    }
+  }
+}
