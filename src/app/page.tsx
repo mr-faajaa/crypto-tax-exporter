@@ -687,12 +687,13 @@ export default function HomePage() {
 }
 
 // Stat Card Component
-function StatCard({ label, value, prefix = '' }: { label: string; value: number; prefix?: string }) {
+function StatCard({ label, value, prefix = '' }: { label: string; value: number | undefined; prefix?: string }) {
+  const displayValue = value ?? 0;
   return (
     <div className="bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-xl p-5">
       <p className="text-xs uppercase tracking-wider text-[var(--color-text-subtle)] mb-1">{label}</p>
       <p className="text-2xl font-display font-semibold tabular-nums">
-        {prefix}{typeof value === 'number' ? value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : value}
+        {prefix}{displayValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
       </p>
     </div>
   );
