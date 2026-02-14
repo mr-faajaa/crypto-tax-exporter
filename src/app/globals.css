@@ -1,65 +1,127 @@
 @import url('https://api.fontshare.com/v2/css?f[]=messapia@400,500,600,700&f[]=jost@400,500,600&display=swap');
 @import url('https://api.fontshare.com/v2/css?f[]=necto-mono@400,500&display=swap');
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-:root {
+@theme {
   --font-display: 'Messapia', sans-serif;
   --font-body: 'Jost', sans-serif;
   --font-mono: 'Necto Mono', monospace;
   
-  --background: 0 0% 4%;
-  --foreground: 0 0% 98%;
+  --color-background: #0a0a0a;
+  --color-foreground: #fafafa;
   
-  --card: 0 0% 8%;
-  --card-foreground: 0 0% 98%;
+  --color-card: #141414;
+  --color-card-foreground: #fafafa;
   
-  --popover: 0 0% 8%;
-  --popover-foreground: 0 0% 98%;
+  --color-primary: #f97316;
+  --color-primary-foreground: #ffffff;
   
-  --primary: 24 95% 53%;
-  --primary-foreground: 0 0% 100%;
+  --color-secondary: #1a1a1a;
+  --color-secondary-foreground: #fafafa;
   
-  --secondary: 0 0% 15%;
-  --secondary-foreground: 0 0% 98%;
+  --color-muted: #1a1a1a;
+  --color-muted-foreground: #a1a1a1;
   
-  --muted: 0 0% 15%;
-  --muted-foreground: 0 0% 64%;
+  --color-accent: #1a1a1a;
+  --color-accent-foreground: #fafafa;
   
-  --accent: 0 0% 15%;
-  --accent-foreground: 0 0% 98%;
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #fafafa;
   
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 0 0% 98%;
+  --color-border: #2a2a2a;
+  --color-input: #2a2a2a;
+  --color-ring: #f97316;
   
-  --border: 0 0% 17%;
-  --input: 0 0% 17%;
-  --ring: 24 95% 53%;
-  
-  --radius: 0.5rem;
+  --radius-lg: 0.5rem;
 }
 
-@layer base {
-  * {
-    @apply border-border;
-  }
-  
-  body {
-    @apply bg-background text-foreground;
-    font-family: var(--font-body);
-  }
-  
-  h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-display);
-  }
-  
-  .font-display {
-    font-family: var(--font-display);
-  }
-  
-  .font-mono {
-    font-family: var(--font-mono);
-  }
+* {
+  border-color: var(--color-border);
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-body);
+  margin: 0;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* shadcn utility fallbacks */
+.border-border {
+  border-color: var(--color-border);
+}
+
+.bg-background {
+  background-color: var(--color-background);
+}
+
+.text-foreground {
+  color: var(--color-foreground);
+}
+
+.bg-card {
+  background-color: var(--color-card);
+}
+
+.text-card-foreground {
+  color: var(--color-card-foreground);
+}
+
+.bg-primary {
+  background-color: var(--color-primary);
+}
+
+.text-primary-foreground {
+  color: var(--color-primary-foreground);
+}
+
+.bg-secondary {
+  background-color: var(--color-secondary);
+}
+
+.text-secondary-foreground {
+  color: var(--color-secondary-foreground);
+}
+
+.bg-muted {
+  background-color: var(--color-muted);
+}
+
+.text-muted-foreground {
+  color: var(--color-muted-foreground);
+}
+
+.bg-accent {
+  background-color: var(--color-accent);
+}
+
+.text-accent-foreground {
+  color: var(--color-accent-foreground);
+}
+
+.bg-destructive {
+  background-color: var(--color-destructive);
+}
+
+.text-destructive-foreground {
+  color: var(--color-destructive-foreground);
+}
+
+.ring-ring {
+  --tw-ring-color: var(--color-ring);
 }
