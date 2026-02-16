@@ -27,6 +27,9 @@ import {
   TableHeader, 
   TableRow 
 } from '@/components/ui/table';
+import GradientText from '@/components/GradientText';
+import GlitchText from '@/components/GlitchText';
+import GlassSurface from '@/components/GlassSurface';
 
 // Types
 interface PerpTransaction {
@@ -239,14 +242,17 @@ export default function HomePage() {
             </div>
             <span className="text-xs uppercase tracking-widest text-muted-foreground">Tax Export</span>
           </div>
-          <h1 className="text-4xl md:text-5xl font-bold mb-4 tracking-tight" style={{ fontFamily: 'var(--font-display)' }}>
+          <GlitchText className="text-4xl md:text-5xl font-bold mb-4 tracking-tight">
             {transactionType === 'perp' ? 'Perpetuals Tax Export' : 'Crypto Tax Export'}
-          </h1>
-          <p className="text-muted-foreground text-lg max-w-xl">
+          </GlitchText>
+          <GradientText 
+            colors={['#f97316', '#ea580c', '#c2410c']}
+            className="text-lg max-w-xl"
+          >
             {transactionType === 'perp' 
               ? 'Export your perpetuals & futures positions to CSV for tax reporting.'
               : 'Multi-chain spot transactions exported to tax-compliant CSV format.'}
-          </p>
+          </GradientText>
         </motion.div>
 
         {/* Type Toggle */}
@@ -333,25 +339,28 @@ export default function HomePage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8"
             >
-              {transactionType === 'perp' ? (
-                <>
-                  <StatCard label="Total PnL" value={summary.totalPnl ?? 0} prefix="$" />
-                  <StatCard label="Fees" value={summary.totalFees ?? 0} prefix="$" />
-                  <StatCard label="Funding" value={summary.totalFunding ?? 0} prefix="$" />
-                  <StatCard label="Open" value={summary.openPositions ?? 0} />
-                  <StatCard label="Assets" value={summary.uniqueAssets ?? 0} />
-                </>
-              ) : (
-                <>
-                  <StatCard label="Trades" value={summary.tradeCount ?? 0} />
+              <GlassSurface className="p-1 mb-8">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  {transactionType === 'perp' ? (
+                    <>
+                      <StatCard label="Total PnL" value={summary.totalPnl ?? 0} prefix="$" />
+                      <StatCard label="Fees" value={summary.totalFees ?? 0} prefix="$" />
+                      <StatCard label="Funding" value={summary.totalFunding ?? 0} prefix="$" />
+                      <StatCard label="Open" value={summary.openPositions ?? 0} />
+                      <StatCard label="Assets" value={summary.uniqueAssets ?? 0} />
+                    </>
+                  ) : (
+                    <>
+                      <StatCard label="Trades" value={summary.tradeCount ?? 0} />
                   <StatCard label="Buys" value={summary.totalBuys ?? 0} prefix="$" />
                   <StatCard label="Sells" value={summary.totalSells ?? 0} prefix="$" />
                   <StatCard label="Fees" value={summary.totalFees ?? 0} prefix="$" />
                   <StatCard label="Assets" value={summary.uniqueAssets ?? 0} />
-                </>
-              )}
+                    </>
+                  )}
+                </div>
+              </GlassSurface>
             </motion.div>
           )}
         </AnimatePresence>
