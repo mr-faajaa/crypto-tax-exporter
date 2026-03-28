@@ -15,8 +15,14 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://api.fontshare.com" crossOrigin="anonymous" />
+        <link href="https://api.fontshare.com/v2/css?f[]=messapia@400,500,600,700&f[]=jost@400,500,600&display=swap" rel="stylesheet" />
+        <link href="https://api.fontshare.com/v2/css?f[]=necto-mono@400,500&display=swap" rel="stylesheet" />
       </head>
-      <body>
+      <body style={{
+        '--font-display': "'Messapia', system-ui, sans-serif",
+        '--font-body': "'Jost', system-ui, sans-serif", 
+        '--font-mono': "'Necto Mono', 'JetBrains Mono', monospace"
+      } as React.CSSProperties}>
         {children}
       </body>
     </html>

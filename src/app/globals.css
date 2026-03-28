@@ -1,39 +1,36 @@
-@import url('https://api.fontshare.com/v2/css?f[]=messapia@400,500,600,700&f[]=jost@400,500,600&display=swap');
-@import url('https://api.fontshare.com/v2/css?f[]=necto-mono@400,500&display=swap');
-
 @import "tailwindcss";
 
 @theme {
-  --font-display: 'Messapia', sans-serif;
-  --font-body: 'Jost', sans-serif;
-  --font-mono: 'Necto Mono', monospace;
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+  --font-mono: var(--font-mono);
   
-  --color-background: #0a0a0a;
+  --color-background: #09090b;
   --color-foreground: #fafafa;
   
-  --color-card: #141414;
+  --color-card: #18181b;
   --color-card-foreground: #fafafa;
   
-  --color-primary: #f97316;
+  --color-primary: #d97706;
   --color-primary-foreground: #ffffff;
   
-  --color-secondary: #1a1a1a;
+  --color-secondary: #27272a;
   --color-secondary-foreground: #fafafa;
   
-  --color-muted: #1a1a1a;
-  --color-muted-foreground: #a1a1a1;
+  --color-muted: #27272a;
+  --color-muted-foreground: #a1a1aa;
   
-  --color-accent: #1a1a1a;
+  --color-accent: #27272a;
   --color-accent-foreground: #fafafa;
   
-  --color-destructive: #ef4444;
-  --color-destructive-foreground: #fafafa;
+  --color-destructive: #dc2626;
+  --color-destructive-foreground: #ffffff;
   
-  --color-border: #2a2a2a;
-  --color-input: #2a2a2a;
-  --color-ring: #f97316;
+  --color-border: #3f3f46;
+  --color-input: #3f3f46;
+  --color-ring: #d97706;
   
-  --radius-lg: 0.5rem;
+  --radius-lg: 0.75rem;
 }
 
 * {
@@ -45,83 +42,54 @@ body {
   color: var(--color-foreground);
   font-family: var(--font-body);
   margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display);
   font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
-.font-display {
-  font-family: var(--font-display);
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
 
-.font-mono {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
+::-webkit-scrollbar-track {
+  background: var(--color-background);
 }
 
-/* shadcn utility fallbacks */
-.border-border {
-  border-color: var(--color-border);
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
 }
 
-.bg-background {
-  background-color: var(--color-background);
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-muted-foreground);
 }
 
-.text-foreground {
+/* Selection */
+::selection {
+  background-color: rgba(217, 119, 6, 0.3);
   color: var(--color-foreground);
 }
 
-.bg-card {
-  background-color: var(--color-card);
+/* Focus visible */
+:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
 }
 
-.text-card-foreground {
-  color: var(--color-card-foreground);
+/* Smooth transitions */
+button, a, input, select {
+  transition: all 0.15s ease;
 }
 
-.bg-primary {
-  background-color: var(--color-primary);
-}
-
-.text-primary-foreground {
-  color: var(--color-primary-foreground);
-}
-
-.bg-secondary {
-  background-color: var(--color-secondary);
-}
-
-.text-secondary-foreground {
-  color: var(--color-secondary-foreground);
-}
-
-.bg-muted {
-  background-color: var(--color-muted);
-}
-
-.text-muted-foreground {
-  color: var(--color-muted-foreground);
-}
-
-.bg-accent {
-  background-color: var(--color-accent);
-}
-
-.text-accent-foreground {
-  color: var(--color-accent-foreground);
-}
-
-.bg-destructive {
-  background-color: var(--color-destructive);
-}
-
-.text-destructive-foreground {
-  color: var(--color-destructive-foreground);
-}
-
-.ring-ring {
-  --tw-ring-color: var(--color-ring);
+/* Tabular numbers for data */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-limits: "tnum";
 }

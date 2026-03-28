@@ -1,24 +1,25 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { motion, AnimatePresence, useSpring, useTransform } from 'framer-motion';
 import { 
   Download, 
-  Wallet, 
-  TrendingUp, 
-  Activity, 
   Search,
   ArrowUpRight,
   ArrowDownRight,
   FileSpreadsheet,
-  Loader2
+  Loader2,
+  ChevronDown,
+  ExternalLink,
+  Clock,
+  Hash,
+  Layers
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Table, 
   TableBody, 
@@ -27,9 +28,6 @@ import {
   TableHeader, 
   TableRow 
 } from '@/components/ui/table';
-import GradientText from '@/components/GradientText';
-import GlitchText from '@/components/GlitchText';
-import GlassSurface from '@/components/GlassSurface';
 
 // Types
 interface PerpTransaction {
@@ -64,33 +62,71 @@ interface SpotTransaction {
 type Transaction = SpotTransaction | PerpTransaction;
 
 const SUPPORTED_CHAINS = [
-  { id: 'solana', name: 'Solana' },
-  { id: 'ethereum', name: 'Ethereum' },
-  { id: 'base', name: 'Base' },
-  { id: 'arbitrum', name: 'Arbitrum' },
-  { id: 'polygon', name: 'Polygon' },
-  { id: 'optimism', name: 'Optimism' },
-  { id: 'bittensor', name: 'Bittensor' },
-  { id: 'polkadot', name: 'Polkadot' },
-  { id: 'osmosis', name: 'Osmosis' },
-  { id: 'ronin', name: 'Ronin' },
+  { id: 'solana', name: 'Solana', color: '#9945FF' },
+  { id: 'ethereum', name: 'Ethereum', color: '#627EEA' },
+  { id: 'base', name: 'Base', color: '#0052FF' },
+  { id: 'arbitrum', name: 'Arbitrum', color: '#28A0F0' },
+  { id: 'polygon', name: 'Polygon', color: '#8247E5' },
+  { id: 'optimism', name: 'Optimism', color: '#FF0420' },
+  { id: 'bittensor', name: 'Bittensor', color: '#252525' },
+  { id: 'polkadot', name: 'Polkadot', color: '#E6007A' },
+  { id: 'osmosis', name: 'Osmosis', color: '#1E1E1E' },
+  { id: 'ronin', name: 'Ronin', color: '#C3141D' },
 ];
 
 const PERP_EXCHANGES = [
-  { id: 'hyperliquid', name: 'Hyperliquid' },
-  { id: 'perpetual', name: 'Perpetual Protocol' },
-  { id: 'gmx', name: 'GMX' },
-  { id: 'synthetix', name: 'Synthetix Perps' },
+  { id: 'hyperliquid', name: 'Hyperliquid', color: '#4A47EE' },
+  { id: 'perpetual', name: 'Perpetual Protocol', color: '#9393DD' },
+  { id: 'gmx', name: 'GMX', color: '#05F2AF' },
+  { id: 'synthetix', name: 'Synthetix', color: '#1A1A2E' },
 ];
 
-function Spinner() {
+// Spring-based animated counter
+function AnimatedNumber({ value, prefix = '', decimals = 2 }: { value: number; prefix?: string; decimals?: number }) {
+  const spring = useSpring(0, { stiffness: 100, damping: 30 });
+  const display = useTransform(spring, (v) => `${prefix}${v.toFixed(decimals)}`);
+  
+  useEffect(() => {
+    spring.set(value);
+  }, [value, spring]);
+  
+  return <motion.span>{display}</motion.span>;
+}
+
+// Subtle fade-in wrapper
+function FadeIn({ children, delay = 0, className = '' }: { children: React.ReactNode; delay?: number; className?: string }) {
   return (
     <motion.div
-      animate={{ rotate: 360 }}
-      transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay, duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
+      className={className}
     >
-      <Loader2 className="h-4 w-4" />
+      {children}
     </motion.div>
+  );
+}
+
+// Chain badge with colored dot
+function ChainBadge({ chain, color }: { chain: string; color: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-mono bg-background/80">
+      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
+      {chain}
+    </span>
+  );
+}
+
+// PnL indicator
+function PnLIndicator({ value }: { value: number }) {
+  const isPositive = value >= 0;
+  return (
+    <span className={cn(
+      "font-mono tabular-nums",
+      isPositive ? "text-emerald-400" : "text-red-400"
+    )}>
+      {isPositive ? '+' : ''}{value.toFixed(2)}
+    </span>
   );
 }
 
@@ -108,16 +144,10 @@ export default function HomePage() {
   const [sideFilter, setSideFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const validateWallet = useCallback((addr: string, chainId: string): boolean => {
-    if (!addr.trim()) return false;
-    switch (chainId) {
-      case 'solana': return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(addr);
-      case 'ethereum': return /^0x[a-fA-F0-9]{40}$/.test(addr);
-      case 'bittensor': return /^5[a-zA-Z0-9]{47}$/.test(addr);
-      case 'polkadot': return /^1[a-zA-HJ-NP-Z1-9]{33}$/.test(addr);
-      default: return addr.length >= 32;
-    }
-  }, []);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const currentOptions = transactionType === 'perp' ? PERP_EXCHANGES : SUPPORTED_CHAINS;
+  const currentOption = currentOptions.find(o => o.id === chain) || currentOptions[0];
 
   const fetchTransactions = useCallback(async () => {
     if (!wallet.trim()) {
@@ -227,374 +257,409 @@ export default function HomePage() {
   const uniqueAssets = [...new Set(transactions.map(tx => tx.asset))].sort();
 
   return (
-    <div className="min-h-screen">
-      <div className="container mx-auto px-4 py-12 max-w-6xl">
-        
-        {/* Header */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-10"
-        >
-          <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 rounded-lg bg-orange-500/10">
-              <FileSpreadsheet className="h-6 w-6 text-orange-500" />
+    <div className="min-h-screen bg-background">
+      {/* Subtle grid pattern */}
+      <div className="fixed inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px] [mask-image:radial-gradient(ellipse_80%_80%_at_50%_50%,black,transparent)]" />
+      
+      <div className="relative">
+        <div className="container mx-auto px-6 py-16 max-w-7xl">
+          
+          {/* Editorial Header - Left aligned */}
+          <FadeIn className="mb-12">
+            <div className="flex items-center gap-3 mb-4">
+              <FileSpreadsheet className="h-5 w-5 text-amber-500/80" />
+              <span className="text-xs uppercase tracking-[0.2em] text-muted-foreground/60 font-medium">Tax Export</span>
             </div>
-            <span className="text-xs uppercase tracking-widest text-muted-foreground">Tax Export</span>
-          </div>
-          <GlitchText className="text-4xl md:text-5xl font-bold mb-4 tracking-tight">
-            {transactionType === 'perp' ? 'Perpetuals Tax Export' : 'Crypto Tax Export'}
-          </GlitchText>
-          <GradientText 
-            colors={['#f97316', '#ea580c', '#c2410c']}
-            className="text-lg max-w-xl"
-          >
-            {transactionType === 'perp' 
-              ? 'Export your perpetuals & futures positions to CSV for tax reporting.'
-              : 'Multi-chain spot transactions exported to tax-compliant CSV format.'}
-          </GradientText>
-        </motion.div>
+            <h1 className="text-5xl md:text-6xl font-bold tracking-tight mb-4 text-left">
+              <span className="text-foreground">{transactionType === 'perp' ? 'Perpetuals' : 'Crypto'}</span>
+              <br />
+              <span className="text-amber-500/90">Tax Export</span>
+            </h1>
+            <p className="text-muted-foreground/70 text-lg max-w-xl text-left leading-relaxed">
+              {transactionType === 'perp' 
+                ? 'Export your perpetuals & futures positions to CSV for tax reporting.'
+                : 'Multi-chain spot transactions exported to tax-compliant CSV format.'}
+            </p>
+          </FadeIn>
 
-        {/* Type Toggle */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.05 }}
-          className="flex gap-2 mb-6"
-        >
-          <Button
-            variant={transactionType === 'spot' ? 'default' : 'ghost'}
-            onClick={() => setTransactionType('spot')}
-            className={transactionType === 'spot' ? '' : 'text-muted-foreground'}
-          >
-            <Activity className="h-4 w-4 mr-2" />
-            Spot
-          </Button>
-          <Button
-            variant={transactionType === 'perp' ? 'default' : 'ghost'}
-            onClick={() => setTransactionType('perp')}
-            className={transactionType === 'perp' ? '' : 'text-muted-foreground'}
-          >
-            <TrendingUp className="h-4 w-4 mr-2" />
-            Perps
-          </Button>
-        </motion.div>
+          {/* Type Toggle - Understated */}
+          <FadeIn delay={0.05} className="flex gap-1 mb-8 bg-secondary/50 p-1 rounded-lg w-fit">
+            <button
+              onClick={() => setTransactionType('spot')}
+              className={cn(
+                "px-4 py-2 text-sm font-medium rounded-md transition-all duration-200",
+                transactionType === 'spot' 
+                  ? "bg-background text-foreground shadow-sm" 
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Spot
+            </button>
+            <button
+              onClick={() => setTransactionType('perp')}
+              className={cn(
+                "px-4 py-2 text-sm font-medium rounded-md transition-all duration-200",
+                transactionType === 'perp' 
+                  ? "bg-background text-foreground shadow-sm" 
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Perps
+            </button>
+          </FadeIn>
 
-        {/* Search Card */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
-          <Card className="mb-8">
-            <CardContent className="pt-6">
-              <div className="flex flex-col md:flex-row gap-4">
-                <Select
-                  value={chain}
-                  onValueChange={setChain}
-                >
-                  <SelectTrigger className="w-full md:w-[200px]">
-                    <SelectValue placeholder={transactionType === 'perp' ? 'Exchange' : 'Chain'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(transactionType === 'perp' ? PERP_EXCHANGES : SUPPORTED_CHAINS).map(opt => (
-                      <SelectItem key={opt.id} value={opt.id}>{opt.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    value={wallet}
-                    onChange={(e) => setWallet(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && fetchTransactions()}
-                    placeholder={`Enter ${transactionType === 'perp' ? PERP_EXCHANGES.find(e => e.id === chain)?.name : SUPPORTED_CHAINS.find(c => c.id === chain)?.name} address...`}
-                    className="pl-10"
-                  />
+          {/* Search Section */}
+          <FadeIn delay={0.1}>
+            <Card className="mb-8 border-border/50 bg-background/80 backdrop-blur">
+              <div className="p-6">
+                <div className="flex flex-col lg:flex-row gap-4">
+                  {/* Chain/Exchange Selector */}
+                  <div className="relative">
+                    <div className="flex items-center gap-2 px-4 py-3 bg-secondary rounded-lg border border-border min-w-[180px]">
+                      <span 
+                        className="w-2 h-2 rounded-full" 
+                        style={{ backgroundColor: currentOption.color }} 
+                      />
+                      <select
+                        value={chain}
+                        onChange={(e) => setChain(e.target.value)}
+                        className="bg-transparent text-sm font-medium outline-none cursor-pointer flex-1 appearance-none"
+                      >
+                        {currentOptions.map(opt => (
+                          <option key={opt.id} value={opt.id}>{opt.name}</option>
+                        ))}
+                      </select>
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </div>
+
+                  {/* Wallet Input */}
+                  <div className="flex-1 relative">
+                    <Input
+                      ref={inputRef}
+                      type="text"
+                      placeholder="Enter wallet address..."
+                      value={wallet}
+                      onChange={(e) => setWallet(e.target.value)}
+                      className="h-12 bg-secondary border-border text-sm font-mono pl-12"
+                      onKeyDown={(e) => e.key === 'Enter' && fetchTransactions()}
+                    />
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">
+                      <Hash className="h-4 w-4" />
+                    </span>
+                  </div>
+
+                  {/* Fetch Button */}
+                  <Button 
+                    onClick={fetchTransactions}
+                    disabled={loading}
+                    className="h-12 px-8 bg-amber-500 hover:bg-amber-600 text-black font-medium"
+                  >
+                    {loading ? (
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                      >
+                        <Loader2 className="h-4 w-4" />
+                      </motion.div>
+                    ) : (
+                      <>
+                        <Search className="h-4 w-4 mr-2" />
+                        Fetch
+                      </>
+                    )}
+                  </Button>
                 </div>
 
-                <Button onClick={fetchTransactions} disabled={loading} className="min-w-[100px]">
-                  {loading ? <Spinner /> : 'Fetch'}
-                </Button>
+                {error && (
+                  <motion.p 
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-3 text-sm text-red-400"
+                  >
+                    {error}
+                  </motion.p>
+                )}
               </div>
+            </Card>
+          </FadeIn>
 
-              {error && (
-                <motion.div 
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  className="mt-4 text-sm text-destructive"
-                >
-                  {error}
-                </motion.div>
-              )}
-            </CardContent>
-          </Card>
-        </motion.div>
+          {/* Summary Stats */}
+          <AnimatePresence mode="wait">
+            {hasSearched && filteredTransactions.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -16 }}
+                className="mb-8"
+              >
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {/* Trades */}
+                  <FadeIn delay={0.15} className="p-4 rounded-xl bg-secondary/50 border border-border/50">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Layers className="h-4 w-4 text-muted-foreground/60" />
+                      <span className="text-xs uppercase tracking-wider text-muted-foreground/60">Trades</span>
+                    </div>
+                    <p className="text-2xl font-bold tabular-nums">{summary.tradeCount}</p>
+                  </FadeIn>
 
-        {/* Summary Stats */}
-        <AnimatePresence>
-          {filteredTransactions.length > 0 && (
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-            >
-              <GlassSurface className="p-1 mb-8">
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                   {transactionType === 'perp' ? (
                     <>
-                      <StatCard label="Total PnL" value={summary.totalPnl ?? 0} prefix="$" />
-                      <StatCard label="Fees" value={summary.totalFees ?? 0} prefix="$" />
-                      <StatCard label="Funding" value={summary.totalFunding ?? 0} prefix="$" />
-                      <StatCard label="Open" value={summary.openPositions ?? 0} />
-                      <StatCard label="Assets" value={summary.uniqueAssets ?? 0} />
+                      {/* PnL */}
+                      <FadeIn delay={0.2} className="p-4 rounded-xl bg-secondary/50 border border-border/50">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-xs uppercase tracking-wider text-muted-foreground/60">PnL</span>
+                        </div>
+                        <p className="text-2xl font-bold"><PnLIndicator value={summary.totalPnl ?? 0} /></p>
+                      </FadeIn>
+                      {/* Fees */}
+                      <FadeIn delay={0.25} className="p-4 rounded-xl bg-secondary/50 border border-border/50">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-xs uppercase tracking-wider text-muted-foreground/60">Fees</span>
+                        </div>
+                        <p className="text-2xl font-bold text-amber-500/80 tabular-nums">${summary.totalFees?.toFixed(2)}</p>
+                      </FadeIn>
+                      {/* Open */}
+                      <FadeIn delay={0.3} className="p-4 rounded-xl bg-secondary/50 border border-border/50">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-xs uppercase tracking-wider text-muted-foreground/60">Open</span>
+                        </div>
+                        <p className="text-2xl font-bold tabular-nums">{summary.openPositions}</p>
+                      </FadeIn>
                     </>
                   ) : (
                     <>
-                      <StatCard label="Trades" value={summary.tradeCount ?? 0} />
-                  <StatCard label="Buys" value={summary.totalBuys ?? 0} prefix="$" />
-                  <StatCard label="Sells" value={summary.totalSells ?? 0} prefix="$" />
-                  <StatCard label="Fees" value={summary.totalFees ?? 0} prefix="$" />
-                  <StatCard label="Assets" value={summary.uniqueAssets ?? 0} />
+                      {/* Buys */}
+                      <FadeIn delay={0.2} className="p-4 rounded-xl bg-secondary/50 border border-border/50">
+                        <div className="flex items-center gap-2 mb-2">
+                          <ArrowDownRight className="h-4 w-4 text-emerald-500" />
+                          <span className="text-xs uppercase tracking-wider text-muted-foreground/60">Buys</span>
+                        </div>
+                        <p className="text-2xl font-bold text-emerald-400 tabular-nums">${summary.totalBuys?.toFixed(2)}</p>
+                      </FadeIn>
+                      {/* Sells */}
+                      <FadeIn delay={0.25} className="p-4 rounded-xl bg-secondary/50 border border-border/50">
+                        <div className="flex items-center gap-2 mb-2">
+                          <ArrowUpRight className="h-4 w-4 text-red-400" />
+                          <span className="text-xs uppercase tracking-wider text-muted-foreground/60">Sells</span>
+                        </div>
+                        <p className="text-2xl font-bold text-red-400 tabular-nums">${summary.totalSells?.toFixed(2)}</p>
+                      </FadeIn>
+                      {/* Fees */}
+                      <FadeIn delay={0.3} className="p-4 rounded-xl bg-secondary/50 border border-border/50">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-xs uppercase tracking-wider text-muted-foreground/60">Fees</span>
+                        </div>
+                        <p className="text-2xl font-bold text-amber-500/80 tabular-nums">${summary.totalFees?.toFixed(2)}</p>
+                      </FadeIn>
                     </>
                   )}
                 </div>
-              </GlassSurface>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-        {/* Filters & Export */}
-        <AnimatePresence>
-          {transactions.length > 0 && (
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              className="flex flex-wrap items-center gap-4 mb-6"
-            >
-              <div className="relative flex-1 min-w-[200px]">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search..."
-                  className="pl-10"
-                />
-              </div>
+          {/* Filters & Table */}
+          <AnimatePresence mode="wait">
+            {hasSearched && filteredTransactions.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -16 }}
+              >
+                {/* Filters Row */}
+                <FadeIn delay={0.2}>
+                  <div className="flex flex-wrap items-center gap-3 mb-4">
+                    {/* Date Filter */}
+                    <div className="flex items-center gap-1 bg-secondary/50 p-1 rounded-lg">
+                      <Clock className="h-3.5 w-3.5 text-muted-foreground ml-2" />
+                      {['all', 'week', 'month'].map(filter => (
+                        <button
+                          key={filter}
+                          onClick={() => setDateFilter(filter)}
+                          className={cn(
+                            "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                            dateFilter === filter 
+                              ? "bg-background text-foreground" 
+                              : "text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          {filter === 'all' ? 'All' : filter === 'week' ? '7d' : '30d'}
+                        </button>
+                      ))}
+                    </div>
 
-              <Select value={dateFilter} onValueChange={setDateFilter}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Date" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All time</SelectItem>
-                  <SelectItem value="week">Last 7 days</SelectItem>
-                  <SelectItem value="month">Last 30 days</SelectItem>
-                </SelectContent>
-              </Select>
+                    {/* Asset Filter */}
+                    <select
+                      value={assetFilter}
+                      onChange={(e) => setAssetFilter(e.target.value)}
+                      className="px-3 py-1.5 text-xs bg-secondary/50 border border-border rounded-lg outline-none cursor-pointer"
+                    >
+                      <option value="all">All Assets</option>
+                      {uniqueAssets.map(asset => (
+                        <option key={asset} value={asset}>{asset}</option>
+                      ))}
+                    </select>
 
-              <Select value={assetFilter} onValueChange={setAssetFilter}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Asset" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All assets</SelectItem>
-                  {uniqueAssets.map(a => (
-                    <SelectItem key={a} value={a}>{a}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              {transactionType === 'spot' && (
-                <Select value={sideFilter} onValueChange={setSideFilter}>
-                  <SelectTrigger className="w-[120px]">
-                    <SelectValue placeholder="Side" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All sides</SelectItem>
-                    <SelectItem value="BUY">Buy</SelectItem>
-                    <SelectItem value="SELL">Sell</SelectItem>
-                  </SelectContent>
-                </Select>
-              )}
-
-              <Button variant="outline" onClick={exportToCSV}>
-                <Download className="h-4 w-4 mr-2" />
-                Export CSV
-              </Button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Table */}
-        <AnimatePresence>
-          {filteredTransactions.length > 0 && (
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-            >
-              <Card>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      {transactionType === 'perp' ? (
-                        <TableHead>Exchange</TableHead>
-                      ) : (
-                        <TableHead>Chain</TableHead>
-                      )}
-                      <TableHead>Asset</TableHead>
-                      <TableHead>Side</TableHead>
-                      <TableHead className="text-right">Size</TableHead>
+                    {/* Side Filter */}
+                    <select
+                      value={sideFilter}
+                      onChange={(e) => setSideFilter(e.target.value)}
+                      className="px-3 py-1.5 text-xs bg-secondary/50 border border-border rounded-lg outline-none cursor-pointer"
+                    >
+                      <option value="all">All Sides</option>
                       {transactionType === 'perp' ? (
                         <>
-                          <TableHead className="text-right">Entry</TableHead>
-                          <TableHead className="text-right">Exit</TableHead>
-                          <TableHead className="text-right">PnL</TableHead>
+                          <option value="LONG">Long</option>
+                          <option value="SHORT">Short</option>
                         </>
                       ) : (
                         <>
-                          <TableHead className="text-right">Price</TableHead>
-                          <TableHead className="text-right">Total</TableHead>
+                          <option value="BUY">Buy</option>
+                          <option value="SELL">Sell</option>
                         </>
                       )}
-                      <TableHead className="text-right">Fees</TableHead>
-                      {transactionType === 'perp' && (
-                        <>
-                          <TableHead className="text-right">Funding</TableHead>
-                          <TableHead className="text-center">Lev</TableHead>
-                        </>
-                      )}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredTransactions.map((tx, i) => (
-                      <motion.tr
-                        key={`${tx.hash}-${i}`}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: i * 0.01 }}
-                      >
-                        <TableCell className="text-muted-foreground">
-                          {new Date(tx.timestamp).toLocaleDateString()}
-                        </TableCell>
-                        {transactionType === 'perp' ? (
-                          <TableCell>
-                            <Badge variant="secondary">{(tx as PerpTransaction).exchange}</Badge>
-                          </TableCell>
-                        ) : (
-                          <TableCell>
-                            <Badge variant="secondary">{tx.chain}</Badge>
-                          </TableCell>
-                        )}
-                        <TableCell className="font-mono font-medium">{tx.asset}</TableCell>
-                        <TableCell>
-                          <Badge variant={tx.side === 'LONG' || tx.side === 'BUY' ? 'default' : 'destructive'}>
-                            {tx.side === 'LONG' || tx.side === 'BUY' ? (
-                              <ArrowUpRight className="h-3 w-3 mr-1" />
-                            ) : (
-                              <ArrowDownRight className="h-3 w-3 mr-1" />
+                    </select>
+
+                    {/* Search */}
+                    <div className="flex-1 min-w-[200px] relative">
+                      <Input
+                        type="text"
+                        placeholder="Search asset, hash..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="h-8 text-xs bg-secondary/50 pl-8"
+                      />
+                      <Search className="h-3.5 w-3.5 text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2" />
+                    </div>
+
+                    {/* Export */}
+                    <Button 
+                      onClick={exportToCSV}
+                      variant="outline" 
+                      className="ml-auto h-8 text-xs gap-2"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      Export CSV
+                    </Button>
+                  </div>
+                </FadeIn>
+
+                {/* Transactions Table */}
+                <FadeIn delay={0.25}>
+                  <Card className="border-border/50 bg-background/80 backdrop-blur overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="border-border/50 hover:bg-transparent">
+                            <TableHead className="text-xs uppercase tracking-wider text-muted-foreground/60">Time</TableHead>
+                            <TableHead className="text-xs uppercase tracking-wider text-muted-foreground/60">Asset</TableHead>
+                            <TableHead className="text-xs uppercase tracking-wider text-muted-foreground/60">Side</TableHead>
+                            <TableHead className="text-xs uppercase tracking-wider text-muted-foreground/60 text-right">Quantity</TableHead>
+                            <TableHead className="text-xs uppercase tracking-wider text-muted-foreground/60 text-right">Price</TableHead>
+                            <TableHead className="text-xs uppercase tracking-wider text-muted-foreground/60 text-right">Total</TableHead>
+                            {transactionType === 'perp' && (
+                              <TableHead className="text-xs uppercase tracking-wider text-muted-foreground/60 text-right">PnL</TableHead>
                             )}
-                            {tx.side}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right font-mono tabular-nums">
-                          {(tx as PerpTransaction).quantity?.toFixed(4) || (tx as SpotTransaction).quantity?.toFixed(4)}
-                        </TableCell>
-                        {transactionType === 'perp' ? (
-                          <>
-                            <TableCell className="text-right font-mono tabular-nums text-muted-foreground">
-                              ${(tx as PerpTransaction).entry_price.toFixed(2)}
-                            </TableCell>
-                            <TableCell className="text-right font-mono tabular-nums text-muted-foreground">
-                              {(tx as PerpTransaction).exit_price ? `$${(tx as PerpTransaction).exit_price?.toFixed(2)}` : '—'}
-                            </TableCell>
-                            <TableCell className={cn(
-                              "text-right font-mono tabular-nums font-medium",
-                              (tx as PerpTransaction).pnl === undefined ? 'text-muted-foreground' : 
-                              (tx as PerpTransaction).pnl! >= 0 ? 'text-green-500' : 'text-red-500'
-                            )}>
-                              {(tx as PerpTransaction).pnl !== undefined ? `$${(tx as PerpTransaction).pnl?.toFixed(2)}` : 'Open'}
-                            </TableCell>
-                          </>
-                        ) : (
-                          <>
-                            <TableCell className="text-right font-mono tabular-nums text-muted-foreground">
-                              ${(tx as SpotTransaction).price.toFixed(2)}
-                            </TableCell>
-                            <TableCell className="text-right font-mono tabular-nums font-medium">
-                              ${(tx as SpotTransaction).total.toFixed(2)}
-                            </TableCell>
-                          </>
-                        )}
-                        <TableCell className="text-right font-mono tabular-nums text-muted-foreground">
-                          ${tx.fees.toFixed(2)}
-                        </TableCell>
-                        {transactionType === 'perp' && (
-                          <>
-                            <TableCell className="text-right font-mono tabular-nums text-muted-foreground">
-                              ${(tx as PerpTransaction).funding.toFixed(2)}
-                            </TableCell>
-                            <TableCell className="text-center">
-                              {(tx as PerpTransaction).leverage > 0 && (
-                                <span className="text-xs text-muted-foreground">{(tx as PerpTransaction).leverage}x</span>
-                              )}
-                            </TableCell>
-                          </>
-                        )}
-                      </motion.tr>
-                    ))}
-                  </TableBody>
-                </Table>
-              </Card>
-            </motion.div>
-          )}
-        </AnimatePresence>
+                            <TableHead className="text-xs uppercase tracking-wider text-muted-foreground/60 text-right">Fees</TableHead>
+                            <TableHead className="text-xs uppercase tracking-wider text-muted-foreground/60">Chain</TableHead>
+                            <TableHead className="text-xs uppercase tracking-wider text-muted-foreground/60">Hash</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          <AnimatePresence mode="popLayout">
+                            {filteredTransactions.slice(0, 50).map((tx, i) => {
+                              const isPerp = transactionType === 'perp';
+                              const perpTx = tx as PerpTransaction;
+                              const spotTx = tx as SpotTransaction;
+                              
+                              return (
+                                <motion.tr
+                                  key={tx.hash + i}
+                                  initial={{ opacity: 0, y: 8 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  exit={{ opacity: 0, y: -8 }}
+                                  transition={{ delay: i * 0.02, duration: 0.2 }}
+                                  className="border-border/30 hover:bg-secondary/30"
+                                >
+                                  <TableCell className="text-sm text-muted-foreground/80 font-mono">
+                                    {new Date(tx.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                  </TableCell>
+                                  <TableCell className="font-medium">{tx.asset}</TableCell>
+                                  <TableCell>
+                                    <Badge 
+                                      variant="outline" 
+                                      className={cn(
+                                        "font-medium text-xs",
+                                        tx.side === 'BUY' || tx.side === 'LONG' 
+                                          ? "border-emerald-500/50 text-emerald-400" 
+                                          : "border-red-500/50 text-red-400"
+                                      )}
+                                    >
+                                      {tx.side}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono tabular-nums text-sm">
+                                    {tx.quantity.toFixed(4)}
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono tabular-nums text-sm">
+                                    ${isPerp ? perpTx.entry_price.toFixed(2) : spotTx.price.toFixed(2)}
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono tabular-nums text-sm">
+                                    ${isPerp ? (perpTx.pnl || 0).toFixed(2) : spotTx.total.toFixed(2)}
+                                  </TableCell>
+                                  {isPerp && (
+                                    <TableCell className="text-right">
+                                      <PnLIndicator value={perpTx.pnl || 0} />
+                                    </TableCell>
+                                  )}
+                                  <TableCell className="text-right font-mono tabular-nums text-sm text-muted-foreground/60">
+                                    ${tx.fees.toFixed(2)}
+                                  </TableCell>
+                                  <TableCell>
+                                    <ChainBadge 
+                                      chain={tx.chain} 
+                                      color={SUPPORTED_CHAINS.find(c => c.id === tx.chain)?.color || '#666'} 
+                                    />
+                                  </TableCell>
+                                  <TableCell className="font-mono text-xs text-muted-foreground/50 max-w-[80px] truncate">
+                                    {tx.hash.slice(0, 8)}...
+                                  </TableCell>
+                                </motion.tr>
+                              );
+                            })}
+                          </AnimatePresence>
+                        </TableBody>
+                      </Table>
+                    </div>
+                    
+                    {filteredTransactions.length > 50 && (
+                      <div className="p-4 text-center text-sm text-muted-foreground/60 border-t border-border/50">
+                        Showing 50 of {filteredTransactions.length} transactions
+                      </div>
+                    )}
+                  </Card>
+                </FadeIn>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-        {/* Empty States */}
-        {!loading && hasSearched && filteredTransactions.length === 0 && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-center py-20"
-          >
-            <Wallet className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-            <p className="text-muted-foreground">No transactions found</p>
-          </motion.div>
-        )}
+          {/* Empty State */}
+          <AnimatePresence>
+            {hasSearched && filteredTransactions.length === 0 && !loading && (
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -16 }}
+                className="text-center py-20"
+              >
+                <p className="text-muted-foreground/60">No transactions found</p>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-        {!loading && !hasSearched && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-center py-20"
-          >
-            <div className="w-20 h-20 mx-auto mb-6 rounded-full border-2 border-dashed flex items-center justify-center">
-              <Wallet className="h-10 w-10 text-orange-500" />
-            </div>
-            <p className="text-xl font-semibold mb-2">Enter a wallet address</p>
-            <p className="text-muted-foreground">
-              Supports {SUPPORTED_CHAINS.map(c => c.name).join(', ')}
-            </p>
-          </motion.div>
-        )}
+        </div>
       </div>
     </div>
-  );
-}
-
-function StatCard({ label, value, prefix = '' }: { label: string; value: number; prefix?: string }) {
-  return (
-    <Card>
-      <CardContent className="pt-6">
-        <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">{label}</p>
-        <p className="text-2xl font-bold tabular-nums">
-          {prefix}{value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </p>
-      </CardContent>
-    </Card>
   );
 }
