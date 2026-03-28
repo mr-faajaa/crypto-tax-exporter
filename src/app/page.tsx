@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { motion, AnimatePresence, useSpring, useTransform } from 'framer-motion';
+import { useState, useCallback, useMemo, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Download, 
   Search,
@@ -10,10 +10,9 @@ import {
   FileSpreadsheet,
   Loader2,
   ChevronDown,
-  ExternalLink,
-  Clock,
   Hash,
-  Layers
+  Layers,
+  Zap
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -28,6 +27,14 @@ import {
   TableHeader, 
   TableRow 
 } from '@/components/ui/table';
+import { 
+  SpotlightCard,
+  StarBorder,
+  CountUp,
+  LetterGlitch,
+  ShinyText,
+  AnimatedContent
+} from '@appletosolutions/reactbits';
 
 // Types
 interface PerpTransaction {
@@ -81,18 +88,6 @@ const PERP_EXCHANGES = [
   { id: 'synthetix', name: 'Synthetix', color: '#1A1A2E' },
 ];
 
-// Spring-based animated counter
-function AnimatedNumber({ value, prefix = '', decimals = 2 }: { value: number; prefix?: string; decimals?: number }) {
-  const spring = useSpring(0, { stiffness: 100, damping: 30 });
-  const display = useTransform(spring, (v) => `${prefix}${v.toFixed(decimals)}`);
-  
-  useEffect(() => {
-    spring.set(value);
-  }, [value, spring]);
-  
-  return <motion.span>{display}</motion.span>;
-}
-
 // Subtle fade-in wrapper
 function FadeIn({ children, delay = 0, className = '' }: { children: React.ReactNode; delay?: number; className?: string }) {
   return (
@@ -127,6 +122,37 @@ function PnLIndicator({ value }: { value: number }) {
     )}>
       {isPositive ? '+' : ''}{value.toFixed(2)}
     </span>
+  );
+}
+
+// Stat card with spotlight effect
+function StatCard({ label, value, icon, prefix = '', delay = 0 }: { 
+  label: string; 
+  value: number; 
+  icon?: React.ReactNode;
+  prefix?: string;
+  delay?: number;
+}) {
+  return (
+    <FadeIn delay={delay}>
+      <SpotlightCard 
+        className="p-4 rounded-xl bg-secondary/50 border border-border/50 backdrop-blur-sm"
+        spotlightColor="rgba(217, 119, 6, 0.15)"
+      >
+        <div className="flex items-center gap-2 mb-2">
+          {icon && <span className="text-muted-foreground/60">{icon}</span>}
+          <span className="text-xs uppercase tracking-wider text-muted-foreground/60">{label}</span>
+        </div>
+        <div className="flex items-baseline gap-1">
+          {prefix && <span className="text-lg text-muted-foreground">{prefix}</span>}
+          <CountUp 
+            to={value} 
+            className="text-2xl font-bold tabular-nums"
+            duration={1.5}
+          />
+        </div>
+      </SpotlightCard>
+    </FadeIn>
   );
 }
 
@@ -259,7 +285,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Subtle grid pattern */}
-      <div className="fixed inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px] [mask-image:radial-gradient(ellipse_80%_80%_at_50%_50%,black,transparent)]" />
+      <div className="fixed inset-0 bg-[linear-gradient(rgba(255,255,255,0.015)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.015)_1px,transparent_1px)] bg-[size:64px_64px] [mask-image:radial-gradient(ellipse_80%_80%_at_50%_50%,black,transparent)]" />
       
       <div className="relative">
         <div className="container mx-auto px-6 py-16 max-w-7xl">
@@ -270,10 +296,16 @@ export default function HomePage() {
               <FileSpreadsheet className="h-5 w-5 text-amber-500/80" />
               <span className="text-xs uppercase tracking-[0.2em] text-muted-foreground/60 font-medium">Tax Export</span>
             </div>
-            <h1 className="text-5xl md:text-6xl font-bold tracking-tight mb-4 text-left">
-              <span className="text-foreground">{transactionType === 'perp' ? 'Perpetuals' : 'Crypto'}</span>
+            <h1 className="text-5xl md:text-6xl font-bold tracking-tight mb-4 text-left leading-[1.1]">
+              <span className="text-foreground">
+                {transactionType === 'perp' ? 'Perpetuals' : 'Crypto'}
+              </span>
               <br />
-              <span className="text-amber-500/90">Tax Export</span>
+              <ShinyText 
+                text="Tax Export" 
+                className="text-amber-500/90"
+                speed={3}
+              />
             </h1>
             <p className="text-muted-foreground/70 text-lg max-w-xl text-left leading-relaxed">
               {transactionType === 'perp' 
@@ -395,63 +427,58 @@ export default function HomePage() {
               >
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {/* Trades */}
-                  <FadeIn delay={0.15} className="p-4 rounded-xl bg-secondary/50 border border-border/50">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Layers className="h-4 w-4 text-muted-foreground/60" />
-                      <span className="text-xs uppercase tracking-wider text-muted-foreground/60">Trades</span>
-                    </div>
-                    <p className="text-2xl font-bold tabular-nums">{summary.tradeCount}</p>
-                  </FadeIn>
+                  <StatCard 
+                    label="Trades" 
+                    value={summary.tradeCount}
+                    icon={<Layers className="h-4 w-4" />}
+                    delay={0.15}
+                  />
 
                   {transactionType === 'perp' ? (
                     <>
                       {/* PnL */}
-                      <FadeIn delay={0.2} className="p-4 rounded-xl bg-secondary/50 border border-border/50">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-xs uppercase tracking-wider text-muted-foreground/60">PnL</span>
-                        </div>
-                        <p className="text-2xl font-bold"><PnLIndicator value={summary.totalPnl ?? 0} /></p>
-                      </FadeIn>
+                      <StatCard 
+                        label="PnL" 
+                        value={summary.totalPnl ?? 0}
+                        delay={0.2}
+                      />
                       {/* Fees */}
-                      <FadeIn delay={0.25} className="p-4 rounded-xl bg-secondary/50 border border-border/50">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-xs uppercase tracking-wider text-muted-foreground/60">Fees</span>
-                        </div>
-                        <p className="text-2xl font-bold text-amber-500/80 tabular-nums">${summary.totalFees?.toFixed(2)}</p>
-                      </FadeIn>
+                      <StatCard 
+                        label="Fees" 
+                        value={summary.totalFees ?? 0}
+                        prefix="$"
+                        delay={0.25}
+                      />
                       {/* Open */}
-                      <FadeIn delay={0.3} className="p-4 rounded-xl bg-secondary/50 border border-border/50">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-xs uppercase tracking-wider text-muted-foreground/60">Open</span>
-                        </div>
-                        <p className="text-2xl font-bold tabular-nums">{summary.openPositions}</p>
-                      </FadeIn>
+                      <StatCard 
+                        label="Open" 
+                        value={summary.openPositions ?? 0}
+                        delay={0.3}
+                      />
                     </>
                   ) : (
                     <>
                       {/* Buys */}
-                      <FadeIn delay={0.2} className="p-4 rounded-xl bg-secondary/50 border border-border/50">
-                        <div className="flex items-center gap-2 mb-2">
-                          <ArrowDownRight className="h-4 w-4 text-emerald-500" />
-                          <span className="text-xs uppercase tracking-wider text-muted-foreground/60">Buys</span>
-                        </div>
-                        <p className="text-2xl font-bold text-emerald-400 tabular-nums">${summary.totalBuys?.toFixed(2)}</p>
-                      </FadeIn>
+                      <StatCard 
+                        label="Buys" 
+                        value={summary.totalBuys ?? 0}
+                        prefix="$"
+                        delay={0.2}
+                      />
                       {/* Sells */}
-                      <FadeIn delay={0.25} className="p-4 rounded-xl bg-secondary/50 border border-border/50">
-                        <div className="flex items-center gap-2 mb-2">
-                          <ArrowUpRight className="h-4 w-4 text-red-400" />
-                          <span className="text-xs uppercase tracking-wider text-muted-foreground/60">Sells</span>
-                        </div>
-                        <p className="text-2xl font-bold text-red-400 tabular-nums">${summary.totalSells?.toFixed(2)}</p>
-                      </FadeIn>
+                      <StatCard 
+                        label="Sells" 
+                        value={summary.totalSells ?? 0}
+                        prefix="$"
+                        delay={0.25}
+                      />
                       {/* Fees */}
-                      <FadeIn delay={0.3} className="p-4 rounded-xl bg-secondary/50 border border-border/50">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-xs uppercase tracking-wider text-muted-foreground/60">Fees</span>
-                        </div>
-                        <p className="text-2xl font-bold text-amber-500/80 tabular-nums">${summary.totalFees?.toFixed(2)}</p>
-                      </FadeIn>
+                      <StatCard 
+                        label="Fees" 
+                        value={summary.totalFees ?? 0}
+                        prefix="$"
+                        delay={0.3}
+                      />
                     </>
                   )}
                 </div>
@@ -472,7 +499,7 @@ export default function HomePage() {
                   <div className="flex flex-wrap items-center gap-3 mb-4">
                     {/* Date Filter */}
                     <div className="flex items-center gap-1 bg-secondary/50 p-1 rounded-lg">
-                      <Clock className="h-3.5 w-3.5 text-muted-foreground ml-2" />
+                      <span className="text-xs text-muted-foreground/60 px-2">Time</span>
                       {['all', 'week', 'month'].map(filter => (
                         <button
                           key={filter}
@@ -533,15 +560,16 @@ export default function HomePage() {
                       <Search className="h-3.5 w-3.5 text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2" />
                     </div>
 
-                    {/* Export */}
-                    <Button 
+                    {/* Export Button with StarBorder */}
+                    <StarBorder
+                      className="ml-auto h-9 px-4"
+                      color="rgba(217, 119, 6, 0.5)"
+                      speed={"2s"}
                       onClick={exportToCSV}
-                      variant="outline" 
-                      className="ml-auto h-8 text-xs gap-2"
                     >
-                      <Download className="h-3.5 w-3.5" />
-                      Export CSV
-                    </Button>
+                      <Download className="h-3.5 w-3.5 mr-2" />
+                      Export
+                    </StarBorder>
                   </div>
                 </FadeIn>
 
@@ -574,58 +602,58 @@ export default function HomePage() {
                               const spotTx = tx as SpotTransaction;
                               
                               return (
-                                <motion.tr
+                                <AnimatedContent
                                   key={tx.hash + i}
-                                  initial={{ opacity: 0, y: 8 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  exit={{ opacity: 0, y: -8 }}
-                                  transition={{ delay: i * 0.02, duration: 0.2 }}
-                                  className="border-border/30 hover:bg-secondary/30"
+                                  direction="vertical"
+                                  distance={20}
+                                  delay={i * 0.02}
                                 >
-                                  <TableCell className="text-sm text-muted-foreground/80 font-mono">
-                                    {new Date(tx.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                  </TableCell>
-                                  <TableCell className="font-medium">{tx.asset}</TableCell>
-                                  <TableCell>
-                                    <Badge 
-                                      variant="outline" 
-                                      className={cn(
-                                        "font-medium text-xs",
-                                        tx.side === 'BUY' || tx.side === 'LONG' 
-                                          ? "border-emerald-500/50 text-emerald-400" 
-                                          : "border-red-500/50 text-red-400"
-                                      )}
-                                    >
-                                      {tx.side}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell className="text-right font-mono tabular-nums text-sm">
-                                    {tx.quantity.toFixed(4)}
-                                  </TableCell>
-                                  <TableCell className="text-right font-mono tabular-nums text-sm">
-                                    ${isPerp ? perpTx.entry_price.toFixed(2) : spotTx.price.toFixed(2)}
-                                  </TableCell>
-                                  <TableCell className="text-right font-mono tabular-nums text-sm">
-                                    ${isPerp ? (perpTx.pnl || 0).toFixed(2) : spotTx.total.toFixed(2)}
-                                  </TableCell>
-                                  {isPerp && (
-                                    <TableCell className="text-right">
-                                      <PnLIndicator value={perpTx.pnl || 0} />
+                                  <TableRow className="border-border/30 hover:bg-secondary/30">
+                                    <TableCell className="text-sm text-muted-foreground/80 font-mono">
+                                      {new Date(tx.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                     </TableCell>
-                                  )}
-                                  <TableCell className="text-right font-mono tabular-nums text-sm text-muted-foreground/60">
-                                    ${tx.fees.toFixed(2)}
-                                  </TableCell>
-                                  <TableCell>
-                                    <ChainBadge 
-                                      chain={tx.chain} 
-                                      color={SUPPORTED_CHAINS.find(c => c.id === tx.chain)?.color || '#666'} 
-                                    />
-                                  </TableCell>
-                                  <TableCell className="font-mono text-xs text-muted-foreground/50 max-w-[80px] truncate">
-                                    {tx.hash.slice(0, 8)}...
-                                  </TableCell>
-                                </motion.tr>
+                                    <TableCell className="font-medium">{tx.asset}</TableCell>
+                                    <TableCell>
+                                      <Badge 
+                                        variant="outline" 
+                                        className={cn(
+                                          "font-medium text-xs",
+                                          tx.side === 'BUY' || tx.side === 'LONG' 
+                                            ? "border-emerald-500/50 text-emerald-400" 
+                                            : "border-red-500/50 text-red-400"
+                                        )}
+                                      >
+                                        {tx.side}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-right font-mono tabular-nums text-sm">
+                                      {tx.quantity.toFixed(4)}
+                                    </TableCell>
+                                    <TableCell className="text-right font-mono tabular-nums text-sm">
+                                      ${isPerp ? perpTx.entry_price.toFixed(2) : spotTx.price.toFixed(2)}
+                                    </TableCell>
+                                    <TableCell className="text-right font-mono tabular-nums text-sm">
+                                      ${isPerp ? (perpTx.pnl || 0).toFixed(2) : spotTx.total.toFixed(2)}
+                                    </TableCell>
+                                    {isPerp && (
+                                      <TableCell className="text-right">
+                                        <PnLIndicator value={perpTx.pnl || 0} />
+                                      </TableCell>
+                                    )}
+                                    <TableCell className="text-right font-mono tabular-nums text-sm text-muted-foreground/60">
+                                      ${tx.fees.toFixed(2)}
+                                    </TableCell>
+                                    <TableCell>
+                                      <ChainBadge 
+                                        chain={tx.chain} 
+                                        color={SUPPORTED_CHAINS.find(c => c.id === tx.chain)?.color || '#666'} 
+                                      />
+                                    </TableCell>
+                                    <TableCell className="font-mono text-xs text-muted-foreground/50 max-w-[80px] truncate">
+                                      {tx.hash.slice(0, 8)}...
+                                    </TableCell>
+                                  </TableRow>
+                                </AnimatedContent>
                               );
                             })}
                           </AnimatePresence>
@@ -640,6 +668,26 @@ export default function HomePage() {
                     )}
                   </Card>
                 </FadeIn>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Loading State */}
+          <AnimatePresence>
+            {loading && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex flex-col items-center justify-center py-20"
+              >
+                <LetterGlitch 
+                  glitchColors={['#d97706', '#f97316', '#fbbf24']}
+                  glitchSpeed={50}
+                  centerVignette={false}
+                  outerVignette={false}
+                  smooth={true}
+                />
               </motion.div>
             )}
           </AnimatePresence>
